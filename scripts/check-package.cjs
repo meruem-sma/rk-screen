@@ -4,7 +4,10 @@ const assert = require('node:assert/strict');
 const asar = require('@electron/asar');
 const root = path.resolve(__dirname, '..');
 const pkg = require('../package.json');
-const archive = path.join(root, pkg.build.directories.output, 'win-unpacked/resources/app.asar');
+const unsignedBeta = process.argv[2] === '--unsigned-beta';
+if (process.argv.slice(2).some(a => a !== '--unsigned-beta')) throw Error('Unknown package check option');
+const output = unsignedBeta ? require('./beta-setup-config.cjs').betaSetupConfig(pkg).directories.output : pkg.build.directories.output;
+const archive = path.join(root, output, 'win-unpacked/resources/app.asar');
 const files = asar.listPackage(archive).map((file) => file.replaceAll('\\', '/'));
 const forbidden = files.filter(
   (file) =>
@@ -24,7 +27,7 @@ for (const file of requiredFiles)
   assert.ok(files.includes('/' + file), 'Missing packaged file: ' + file);
 let checked = 0;
 for (const file of files) {
-  if (!/^\/(src|assets)\//.test(file) && file !== '/index.html') continue;
+  if (!/^\/(src|assets)\//.test(file) && !['/index.html', '/LICENSE', '/THIRD-PARTY-NOTICES.txt'].includes(file)) continue;
   const relative = file.slice(1);
   if (!fs.statSync(path.join(root, relative)).isFile()) continue;
   assert.ok(

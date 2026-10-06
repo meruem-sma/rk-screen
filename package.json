@@ -15,6 +15,7 @@
     "dist": "node scripts/build.cjs && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
     "dist:portable": "node scripts/build.cjs portable && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
     "dist:setup": "node scripts/build.cjs nsis && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
+    "dist:setup:beta": "node scripts/build.cjs nsis --unsigned-beta && node scripts/check-package.cjs --unsigned-beta",
     "sign": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sign.ps1",
     "format": "prettier --write index.html src tests scripts package.json README.md",
     "check:package": "node scripts/check-package.cjs",
@@ -37,12 +38,6 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
           "arch": [
             "x64"
           ]

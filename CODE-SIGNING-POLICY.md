@@ -6,6 +6,8 @@ Authors, reviewers and release approvers: [meruem-sma](https://github.com/meruem
 
 Only artifacts traceable to this public repository and built by GitHub-hosted workflows may be submitted for project signing. Existing third-party signatures must be preserved. Electron, Chromium, Koffi and other upstream binaries cannot be signed with the project's Foundation certificate without an approved provider policy. Packaging and timestamp/signature checks must cover the actual distribution format. An unsigned build artifact is not a signed public release.
 
-Approval, artifact configuration and treatment of the portable launcher's embedded payload must be agreed with SignPath before enabling production signing. The acknowledgment required by the provider will be added when the service is actually approved and used.
+On October 6, 2026, the maintainer explicitly requested unsigned Beta 1 setup distribution. This exception is restricted to beta versions, carries `signed: false` in the public feed, and does not bypass Windows security checks. Signed builds remain the default release path.
+
+Approval, artifact configuration and treatment of the NSIS installer's embedded payload must be agreed with SignPath before enabling production signing. The acknowledgment required by the provider will be added when the service is actually approved and used.
 
 See [PRIVACY.md](PRIVACY.md) for data handling and third-party connections, and [SECURITY.md](SECURITY.md) for vulnerability reporting.

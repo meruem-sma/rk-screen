@@ -78,7 +78,7 @@ Daha büyük ekranlarda veri sınırı en fazla iki katına çıkar. Bunlar hede
 - Kontrol çalışmıyorsa paylaşan bilgisayarın kontrol iznini, araç çubuğundaki modu ve uzak ekranın odağını kontrol edin.
 - Yönetici olarak çalışan uygulamalar ve UAC güvenli masaüstü Windows tarafından sınırlandırılır. Uygulama bu korumaları aşmaz.
 - Siyah ekran/açılış sorunu için Ayarlar → **Windows uyumluluk modu** seçeneğini açıp uygulamayı kapatıp açın. Donanım hızlandırması kapanır; performans düşebilir.
-- Pencere hiç açılmıyorsa terminalden `RK-Screen-Portable-1.0.0-beta.1.exe --safe-mode` ile deneyin.
+- Grafik kaynaklı açılış sorunu için kurulu `RK Screen.exe --safe-mode` ile deneyin. Bu seçenek Windows'un imza engelini kaldırmaz.
 - Açılış ve işlem hataları kullanıcı veri klasöründeki `logs/startup.log` dosyasına yazılır. Ekran, pano, sohbet ve tuş içerikleri bu günlüğe yazılmaz.
 - Uygulamayı tekrar açmak mevcut pencereyi öne getirir.
 
@@ -98,9 +98,11 @@ npm run test:overlay
 npm run release
 ```
 
-`release`, birim/arayüz/yerel bağlantı/açılış/işaretçi penceresi testlerini çalıştırır; ardından iki Windows paketini üretir, paket içeriğini kontrol eder, güvenilir imzalama kimliğiyle imzalar ve eski sürümleri temizler. Yeni sürüm hazırlanırken `package.json` sürümü, kilit dosyası ve çıktı klasörü birlikte güncellenmelidir. `npm run dist` yalnızca paketleme hattını çalıştırır; testleri ayrıca çalıştırmak gerekir.
+`release`, birim/arayüz/yerel bağlantı/açılış/işaretçi penceresi testlerini çalıştırır; ardından Windows kurulum paketini üretir, paket içeriğini kontrol eder, güvenilir imzalama kimliğiyle imzalar ve eski sürümleri temizler. Yeni sürüm hazırlanırken `package.json` sürümü, kilit dosyası ve çıktı klasörü birlikte güncellenmelidir. `npm run dist` yalnızca paketleme hattını çalıştırır; testleri ayrıca çalıştırmak gerekir.
 
-Çıktılar `dist/1.0.0-beta.1/` içindedir: kurulum EXE, taşınabilir EXE, `SHA256SUMS.txt` ve `release.json`. Temizlik sadece bu ürüne ait olduğu doğrulanan daha eski dağıtım klasörlerine uygulanır; kaynak ve kullanıcı verilerine uygulanmaz. Bu işlem kullanıcının bilgisayarında kurulu uygulamayı uzaktan güncellemez. İmzalı otomatik güncelleme ayrı bir geliştirme aşamasıdır.
+Çıktılar `dist/1.0.0-beta.1/` içindedir: kurulum EXE, `SHA256SUMS.txt` ve `release.json`. Temizlik sadece bu ürüne ait olduğu doğrulanan daha eski dağıtım klasörlerine uygulanır; kaynak ve kullanıcı verilerine uygulanmaz. Bu işlem kullanıcının bilgisayarında kurulu uygulamayı uzaktan güncellemez. İmzalı otomatik güncelleme ayrı bir geliştirme aşamasıdır.
+
+Bakım sorumlusunun 6 Ekim 2026 talebiyle Beta 1 imzasız setup olarak sunulur. `npm run dist:setup:beta` yalnızca beta sürümleri için ayrı `review/setup-candidate/<sürüm>/` klasörüne imzasız aday üretir ve paket içeriğini doğrular. Normal imzalı yayın hattı değişmez. Adayın kurulumu ve açılması denenmeden, GitHub dosyası/özeti doğrulanmadan mevcut indirme değiştirilmez. Setup da Windows tarafından engellenebilir; bu yol imza sorununu çözmüş sayılmaz.
 
 `test:native` gerçek ekran yakalamayı açıp kapatır; görüntüyü dışarı göndermez. Fare/klavye testleri gerçek kullanıcı masaüstüne olay göndermez. `test:e2e` gerçek WebRTC, yapay ekran/pano ve gerçek dosya alıcı koduyla yerel iki oturumu sınar. `test:startup` izole bir test penceresinde arayüz çökmesi ve ikinci açılışı sınar. Sonuçlar [SISTEM-DENETIMI.md](SISTEM-DENETIMI.md) içindedir.
 
@@ -128,10 +130,10 @@ Gerçek iki fiziksel bilgisayarda klavye düzenleri, karma DPI/çoklu monitör, 
 
 ## İmzalama, yükseltme ve lisans
 
-Mevcut Beta 1 imzasızdır ve Windows Akıllı Uygulama Denetimi tarafından engellenebilir. Yeni yayın derlemeleri artık imzalama kimliği yoksa durur. İç uygulama ve dış paket birlikte imzalanmalıdır. Sertifika kurulumu, doğrulama ve aynı Beta 1 yayınını güncelleme adımları: [WINDOWS-IMZALAMA.md](WINDOWS-IMZALAMA.md).
+Mevcut Beta 1 setup imzasızdır ve Windows Akıllı Uygulama Denetimi tarafından engellenebilir. Normal yayın derlemeleri imzalama kimliği yoksa durur; açıkça talep edilen imzasız beta adayı yukarıda açıklanan ayrı komutla oluşturulur. İç uygulama ve dış paket birlikte imzalanmalıdır. Sertifika kurulumu ve doğrulama adımları: [WINDOWS-IMZALAMA.md](WINDOWS-IMZALAMA.md).
 
 Eski kurulumu güncelleyebilmek için dahili uygulama kimliği `com.rksoftworks.menzil` korunmuştur. Paketli uygulama varsa eski Menzil kullanıcı veri klasörünü ve mevcut tercih anahtarlarını kullanır. Bunlar görünür ürün adı değildir. Gerçek kurulumdan yükseltme döngüsü temiz Windows makinesinde ayrıca doğrulanmalıdır.
 
-Kaynak kodu [MIT lisansıyla](LICENSE) yayımlanır. Üçüncü taraf bileşenlerin lisansları [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) içinde korunur. Mevcut eski Beta 1 EXE bu açık kaynak geçişinden önce oluşturulmuştur; güncel kaynakla aynı hash'e sahip yeni bir imzalı paket henüz üretilmemiştir.
+Kaynak kodu [MIT lisansıyla](LICENSE) yayımlanır. Üçüncü taraf bileşenlerin lisansları [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) içinde korunur. 6 Ekim 2026 setup güncel kaynaklardan, MIT lisansı ve bildirimler eklenerek yeniden üretildi. Henüz imzalı bir paket yayımlanmadı.
 
 RK Softworks · rksoftworks@gmail.com

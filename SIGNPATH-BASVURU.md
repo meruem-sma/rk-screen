@@ -12,11 +12,11 @@
 - Bakım sorumlusu: GitHub meruem-sma
 - İmzalama politikası: CODE-SIGNING-POLICY.md
 - Gizlilik: PRIVACY.md
-- Mevcut dağıtım: Windows x64, taşınabilir NSIS EXE, 1.0.0-beta.1, imzasız.
+- Mevcut dağıtım: Windows x64, NSIS kurulum EXE, 1.0.0-beta.1, imzasız.
 
 ## Başvuru açıklaması
 
-RK Screen is a new open-source Windows remote support application using Electron, WebRTC/PeerJS and Koffi. It supports user-approved screen sharing, permission-based mouse and keyboard control, session chat, accepted file transfer and optional clipboard/audio sharing. There is no unattended access or Windows security bypass. The current portable Beta 1 is unsigned and can be blocked by Smart App Control. We seek Foundation review for free signing of verifiable builds from our GitHub source repository. This is a new project; we do not claim an established user base, independent security audit or prior approval. Please confirm whether the Electron portable NSIS format and upstream native/runtime components can be supported, and advise the permitted signing scope and build/artifact policy.
+RK Screen is a new open-source Windows remote support application using Electron, WebRTC/PeerJS and Koffi. It supports user-approved screen sharing, permission-based mouse and keyboard control, session chat, accepted file transfer and optional clipboard/audio sharing. There is no unattended access or Windows security bypass. The current Beta 1 NSIS setup is unsigned and can be blocked by Smart App Control. We seek Foundation review for free signing of verifiable builds from our GitHub source repository. This is a new project; we do not claim an established user base, independent security audit or prior approval. Please confirm whether the Electron NSIS installer and upstream native/runtime components can be supported, and advise the permitted signing scope and build/artifact policy.
 
 ## Onaydan önce tamamlanacaklar
 

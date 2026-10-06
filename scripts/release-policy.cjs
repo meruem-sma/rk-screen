@@ -27,6 +27,6 @@ function isOlderDownloadRelease(release, current) {
   const version = release.tag_name?.replace(/^v/, '');
   return !release.draft && release.tag_name === 'v' + version &&
     isOlderProductRelease(version, { name: 'rk-screen', version }, current) &&
-    release.assets?.some(a => a.name === `RK-Screen-Portable-${version}.exe`);
+    release.assets?.some(a => ['Portable', 'Setup'].some(kind => a.name === `RK-Screen-${kind}-${version}.exe`));
 }
 module.exports = { isOlderProductRelease, parseVersion, isOlderDownloadRelease };

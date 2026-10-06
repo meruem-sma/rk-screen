@@ -1,6 +1,17 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { signingConfig } = require('../scripts/signing-config.cjs');
+const { betaSetupConfig } = require('../scripts/beta-setup-config.cjs');
+
+test('unsigned setup requires a beta version and cannot replace the current release output', () => {
+  for (const version of ['1.0.0', '../1.0.0-beta.1', 'unknown'])
+    assert.throws(() => betaSetupConfig({ version }), /restricted/);
+  const config = betaSetupConfig({ version: '1.0.0-beta.1' });
+  assert.equal(config.forceCodeSigning, false);
+  assert.equal(config.win.signExecutable, false);
+  assert.ok(config.directories.output.replaceAll('\\', '/').startsWith('review/setup-candidate/'));
+  assert.throws(() => signingConfig({}), /Public release blocked/);
+});
 test('public build stops without a signing identity', () => {
   assert.throws(() => signingConfig({}), /Public release blocked/);
   assert.throws(() => signingConfig({ RKSCREEN_SIGN_PASSWORD: 'test-only' }), /Public release blocked/);

@@ -1,8 +1,21 @@
 const path = require('node:path');
 const { signingConfig } = require('./signing-config.cjs');
-// Fail before loading the builder or replacing an existing release.
-const signing = signingConfig(process.env);
-require('./signing-preflight.cjs').signingPreflight();
+const pkg = require('../package.json');
+const args = process.argv.slice(2);
+const unsignedBeta = args.includes('--unsigned-beta');
+const target = args.find(a => !a.startsWith('--'));
+if (args.some(a => !['nsis', 'portable', '--unsigned-beta'].includes(a)) ||
+    args.filter(a => !a.startsWith('--')).length > 1 || args.length > 2)
+  throw Error('Usage: build.cjs [nsis|portable] [--unsigned-beta]');
+if (unsignedBeta && target !== 'nsis') throw Error('Unsigned beta mode only builds the setup target.');
+// Signed releases remain the default. Explicit unsigned beta candidates are
+// isolated from the currently published package and never described as signed.
+const signing = unsignedBeta ? require('./beta-setup-config.cjs').betaSetupConfig(pkg) : signingConfig(process.env);
+if (!unsignedBeta) require('./signing-preflight.cjs').signingPreflight();
+else {
+  process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
+  console.warn('UNSIGNED BETA SETUP: Windows may block this package. Current release retained until verification.');
+}
 const { build, Platform, Arch } = require('electron-builder');
 const { WineVmManager } = require('app-builder-lib/out/vm/WineVm');
 const { UninstallerReader } = require('app-builder-lib/out/targets/nsis/nsisUtil');
@@ -25,11 +38,9 @@ WineVmManager.prototype.execWine = function (request) {
   }
   return originalExec.call(this, request);
 };
-const target = process.argv[2];
-if (target && !['nsis', 'portable'].includes(target)) throw new Error('Unknown build target');
 build({
   config: signing,
-  targets: Platform.WINDOWS.createTarget(target ? [target] : ['nsis', 'portable'], Arch.x64),
+  targets: Platform.WINDOWS.createTarget(target ? [target] : ['nsis'], Arch.x64),
   publish: 'never',
 }).catch((error) => {
   console.error(error);
