@@ -1,0 +1,49 @@
+name: Build RK Screen Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:signing
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      - run: npm test
+      - run: npm run test:ui
+      - run: npm run test:e2e
+      - run: npm run test:startup
+      - run: npm run test:overlay
+      - run: npm run test:native
+      - run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rk-screen-windows-binaries
+          path: |
+            dist/*/*.exe
+            dist/*/*.blockmap
+            dist/*/SHA256SUMS.txt
+            dist/*/release.json
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          prerelease: ${{ contains(github.ref_name, '-beta.') }}
+          files: |
+            dist/*/*.exe
+            dist/*/*.blockmap
+            dist/*/SHA256SUMS.txt
+            dist/*/release.json
+          generate_release_notes: true

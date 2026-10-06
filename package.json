@@ -1,0 +1,103 @@
+{
+  "name": "rk-screen",
+  "version": "1.0.0-beta.1",
+  "description": "RK Screen - Ekran Paylaşımı ve Uzaktan Destek",
+  "main": "src/main.js",
+  "author": {
+    "name": "RK Softworks",
+    "email": "rksoftworks@gmail.com"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "test": "node --test tests/*.test.js",
+    "test:ui": "electron tests/ui-smoke.cjs",
+    "dist": "node scripts/build.cjs && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
+    "dist:portable": "node scripts/build.cjs portable && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
+    "dist:setup": "node scripts/build.cjs nsis && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
+    "sign": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sign.ps1",
+    "format": "prettier --write index.html src tests scripts package.json README.md",
+    "check:package": "node scripts/check-package.cjs",
+    "test:e2e": "electron tests/e2e-smoke.cjs",
+    "test:startup": "electron tests/startup-smoke.cjs",
+    "test:native": "electron tests/native-smoke.cjs",
+    "release": "npm run check:signing && npm test && npm run test:ui && npm run test:e2e && npm run test:startup && npm run test:overlay && npm run test:native && npm run dist",
+    "test:overlay": "electron tests/overlay-smoke.cjs",
+    "check:signing": "node scripts/signing-config.cjs",
+    "licenses:refresh": "node scripts/third-party-notices.cjs"
+  },
+  "build": {
+    "appId": "com.rksoftworks.menzil",
+    "productName": "RK Screen",
+    "copyright": "Copyright © 2026 RK Softworks. Tüm hakları saklıdır.",
+    "directories": {
+      "output": "dist/1.0.0-beta.1"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/blank.ico",
+      "legalTrademarks": "RK Softworks",
+      "requestedExecutionLevel": "asInvoker",
+      "signtoolOptions": {
+        "publisherName": "RK Softworks"
+      }
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RK Screen",
+      "artifactName": "RK-Screen-Setup-${version}.${ext}",
+      "uninstallDisplayName": "RK Screen"
+    },
+    "portable": {
+      "artifactName": "RK-Screen-Portable-${version}.${ext}"
+    },
+    "files": [
+      "package.json",
+      "index.html",
+      "src/**/*.js",
+      "src/**/*.css",
+      "assets/blank.ico",
+      "src/cursor-overlay.html",
+      "LICENSE",
+      "THIRD-PARTY-NOTICES.txt",
+      "!node_modules/koffi/build/koffi/{darwin_*,freebsd_*,linux_*,musl_*,openbsd_*,win32_arm64,win32_ia32}/**/*"
+    ]
+  },
+  "license": "MIT",
+  "homepage": "https://rkscreen.com.tr/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meruem-sma/rk-screen.git"
+  },
+  "dependencies": {
+    "koffi": "^2.9.0",
+    "peerjs": "^1.5.5"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3",
+    "prettier": "3.6.2",
+    "ws": "8.22.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
