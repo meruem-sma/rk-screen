@@ -1,6 +1,6 @@
 # Ücretsiz kod imzalama başvurusu
 
-6 Ekim 2026. Kaynakların MIT lisansıyla yayımlanması için hazırlık yapıldı. SignPath kabulü, hesap kurulumu veya üretim imzası henüz yoktur. Foundation, projeleri kendi değerlendirmesiyle kabul eder; yeni bir projenin kabulü garanti değildir.
+6 Ekim 2026. Kaynaklar MIT lisansıyla GitHub'da yayımlandı ve GitHub otomatik kontrolleri geçti. SignPath kabulü, hesap kurulumu veya üretim imzası henüz yoktur. Foundation, projeleri kendi değerlendirmesiyle kabul eder; yeni bir projenin kabulü garanti değildir.
 
 ## Başvuruda kullanılacak bilgiler
 
