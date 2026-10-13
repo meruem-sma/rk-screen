@@ -5,28 +5,91 @@ const {
   receiveSample,
   AdaptiveQuality,
   RecoveryBudget,
+  RealtimeLane,
+  RetryBackoff,
 } = require('../src/core/transport');
 const { isOlderProductRelease } = require('../scripts/release-policy.cjs');
 const { validMessage } = require('../src/core/session');
 const profile = { bitrate: 12000000, fps: 60 };
 
-test('Adaptive bitrate needs sustained evidence and recovers slowly without oscillating', () => {
+test('Transport estimates cannot ratchet the encoder ceiling down on a healthy or constrained link', () => {
   const a = new AdaptiveQuality();
   const bad = { available: 2000000, limitation: 'bandwidth' };
   assert.equal(a.update(profile, bad), false);
-  assert.equal(a.update(profile, bad), true);
-  assert.equal(a.limits(profile).bitrate, 1700000);
+  assert.equal(a.update(profile, bad), false);
+  assert.equal(a.limits(profile).bitrate, profile.bitrate);
   for (let i = 0; i < 20; i++) a.update(profile, bad);
-  assert.equal(a.limits(profile).bitrate, 1700000);
-  const good = { available: 20000000, limitation: 'none' };
+  assert.equal(a.limits(profile).bitrate, profile.bitrate);
+  assert.equal(a.limits(profile).fps, 30);
+  const good = { available: 750000, limitation: 'none' };
   for (let i = 0; i < 4; i++) a.update(profile, good);
-  assert.equal(a.limits(profile).bitrate, 1700000);
+  assert.equal(a.limits(profile).fps, 30);
   a.update(profile, good);
-  assert.equal(a.limits(profile).bitrate, 1955000);
+  assert.equal(a.limits(profile).fps, 60);
   for (const available of [null, undefined, NaN, -1, 0]) a.update(profile, { available });
-  assert.equal(a.limits(profile).bitrate, 1955000);
+  assert.equal(a.limits(profile).bitrate, profile.bitrate);
   a.reset();
   assert.deepEqual(a.limits(profile), profile);
+});
+
+test('Real-time lane keeps PeerJS control channel, discards old motion and cannot inject reliable commands', () => {
+  let originalEvents = 0;
+  const channel = {
+    label: 'rk-screen-live-v8',
+    ordered: false,
+    maxRetransmits: 0,
+    readyState: 'open',
+    bufferedAmount: 0,
+    messages: [],
+    send(m) {
+      this.messages.push(m);
+    },
+    close() {
+      this.closed = true;
+    },
+  };
+  const pc = {
+    ondatachannel() {
+      originalEvents++;
+    },
+    createDataChannel() {
+      return channel;
+    },
+  };
+  const received = [];
+  const lane = new RealtimeLane(pc, (m) => received.push(m));
+  pc.ondatachannel({ channel: { label: 'peerjs-control' } });
+  assert.equal(originalEvents, 1);
+  lane.start();
+  assert.equal(lane.send({ type: 'pointer', x: 0.1, y: 0.2 }), true);
+  channel.bufferedAmount = 10000;
+  lane.send({ type: 'pointer', x: 0.9, y: 0.9 });
+  assert.equal(channel.messages.length, 1, 'congested lane must not queue stale motion');
+  for (const m of [
+    { type: 'cursor', liveSequence: 2 },
+    { type: 'cursor', liveSequence: 1 },
+    { type: 'key', liveSequence: 3 },
+    { type: 'pointer', liveSequence: 1 },
+  ])
+    channel.onmessage({ data: JSON.stringify(m) });
+  assert.deepEqual(
+    received.map((m) => m.type),
+    ['cursor', 'pointer'],
+  );
+  lane.close();
+  pc.ondatachannel({ channel: { label: 'peerjs-control' } });
+  assert.equal(originalEvents, 2);
+  assert.equal(channel.closed, true);
+});
+
+test('Signaling retries back off to a bounded interval and reset after reconnecting', () => {
+  const b = new RetryBackoff();
+  assert.deepEqual(
+    Array.from({ length: 8 }, () => b.next()),
+    [1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000],
+  );
+  b.reset();
+  assert.equal(b.next(), 1000);
 });
 test('CPU pressure reduces frame target; missing or bandwidth measurements do not claim CPU recovery', () => {
   const a = new AdaptiveQuality();

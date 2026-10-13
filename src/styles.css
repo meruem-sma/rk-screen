@@ -907,6 +907,18 @@ dialog p {
   transform: rotate(225deg);
   font-size: 22px;
 }
+.viewport-pointer-active {
+  cursor: none;
+}
+.self-cursor {
+  color: #f4cd8c;
+  z-index: 3;
+}
+.self-cursor .cursor-name {
+  border-color: #c29a5c;
+  background: #46331def;
+  color: #fff4df;
+}
 .cursor-name {
   position: absolute;
   left: 17px;

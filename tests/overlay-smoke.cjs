@@ -50,7 +50,7 @@ app.whenReady().then(async () => {
       path.join(root, 'review', 'named-pointer.png'),
       (await win.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG(),
     );
-    await delay(1500);
+    await delay(3100);
     assert.equal(overlay.pending, null);
     overlay.close();
     assert.equal(win.isDestroyed(), true);

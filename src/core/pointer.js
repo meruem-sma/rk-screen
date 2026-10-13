@@ -11,4 +11,37 @@ function overlayGeometry(bounds, point) {
   const y = Math.max(bounds.y, Math.min(bounds.y + bounds.height - height, py - 4));
   return { x, y, width, height, tipX: px - x, tipY: py - y };
 }
-module.exports = { cleanName, overlayGeometry };
+class CursorOwnership {
+  constructor() {
+    this.physical = null;
+    this.injected = null;
+    this.local = null;
+    this.localUntil = 0;
+    this.sequence = 0;
+  }
+  observe(point, now) {
+    if (!point) return;
+    const moved = !this.physical || point.x !== this.physical.x || point.y !== this.physical.y;
+    const injected =
+      this.injected &&
+      Math.abs(point.x - this.injected.x) <= 1 &&
+      Math.abs(point.y - this.injected.y) <= 1;
+    if (moved && !injected) {
+      this.local = { ...point };
+      if (this.physical) this.localUntil = now + 350;
+    }
+    this.physical = { ...point };
+  }
+  recordInjected(point) {
+    this.physical = this.injected = { ...point };
+  }
+  acceptMove(sequence) {
+    if (!Number.isSafeInteger(sequence) || sequence <= this.sequence) return false;
+    this.sequence = sequence;
+    return true;
+  }
+  recordButton(sequence) {
+    if (Number.isSafeInteger(sequence)) this.sequence = Math.max(this.sequence, sequence);
+  }
+}
+module.exports = { cleanName, overlayGeometry, CursorOwnership };

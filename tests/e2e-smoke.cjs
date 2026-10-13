@@ -16,7 +16,7 @@ let server;
 const watchdog = setTimeout(() => {
   console.error('E2E timeout');
   app.exit(1);
-}, 60000);
+}, 90000);
 app
   .whenReady()
   .then(async () => {
@@ -127,6 +127,13 @@ app
     });
     const port = server.address().port;
     const bootstrap = `
+    window.testLiveChannels=[];
+    const originalDataChannel=RTCPeerConnection.prototype.createDataChannel;
+    RTCPeerConnection.prototype.createDataChannel=function(label,options){
+      const channel=originalDataChannel.call(this,label,options);
+      if(label==='rk-screen-live-v8')testLiveChannels.push(channel);
+      return channel;
+    };
     const RealPeer = window.Peer;
     window.Peer = class extends RealPeer {
       constructor(id, options) { super(id, { ...options, host: '127.0.0.1', port: ${port}, path: '/', secure: false, config: { iceServers: [] } }); window.testPeer=this; }
@@ -229,6 +236,11 @@ app
         "document.getElementById('remote-video').videoWidth===640 && document.getElementById('remote-video').currentTime>0.2",
       );
       console.log('E2E video received: 640x360 over real WebRTC');
+      await wait(controller, "testLiveChannels[0]?.readyState==='open'");
+      assert.deepEqual(
+        await run(controller, '[testLiveChannels[0].ordered,testLiveChannels[0].maxRetransmits]'),
+        [false, 0],
+      );
       await wait(controller, "!document.getElementById('remote-cursor').hidden");
       assert.equal(
         await run(controller, "document.getElementById('cursor-name').textContent"),
@@ -246,6 +258,56 @@ app
       );
       const keyBeforeRecovery = hostState.session.videoKey;
       const sessionBeforeRecovery = hostState.session.token;
+      await run(
+        controller,
+        "window.dataPc=Object.values(testPeer.connections).flat().find(c=>c.type==='data'&&c.open);Object.defineProperty(dataPc.dataChannel,'bufferedAmount',{configurable:true,get:()=>1000000});const v=document.getElementById('viewport'),r=document.getElementById('video-stage').getBoundingClientRect();v.focus();v.dispatchEvent(new PointerEvent('pointermove',{clientX:r.left+r.width/2,clientY:r.top+r.height/2}));",
+      );
+      const pointerCount = hostState.pointers.length;
+      assert.equal(await run(controller, "document.getElementById('self-cursor').hidden"), false);
+      assert.equal(await run(controller, "document.getElementById('remote-cursor').hidden"), false);
+      assert.equal(
+        await run(controller, "document.getElementById('self-cursor-name').textContent"),
+        'Enes',
+      );
+      await delay(2400);
+      assert.ok(
+        hostState.pointers.length >= pointerCount + 2,
+        'stationary pointer stays alive despite reliable-channel backlog',
+      );
+      assert.ok(
+        hostState.inputs.some((m) => m.type === 'mouse-move'),
+        'mouse motion bypasses file/control backlog',
+      );
+      await run(controller, 'delete dataPc.dataChannel.bufferedAmount;');
+      await run(
+        controller,
+        "window.shortCall=Object.values(testPeer.connections).flat().find(c=>c.type==='media');Object.defineProperty(shortCall.peerConnection,'connectionState',{configurable:true,value:'disconnected'});shortCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));",
+      );
+      await wait(controller, "!document.getElementById('video-wait').hidden");
+      await delay(150);
+      assert.equal(hostState.session.inputPaused, true);
+      await run(
+        controller,
+        "Object.defineProperty(shortCall.peerConnection,'connectionState',{configurable:true,value:'connected'});shortCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));",
+      );
+      await wait(controller, "document.getElementById('video-wait').hidden");
+      await delay(4200);
+      assert.equal(
+        hostState.session.videoKey,
+        keyBeforeRecovery,
+        'short interruption resumes after a fresh frame without rebuilding',
+      );
+      assert.equal(hostState.session.inputPaused, false);
+      for (let shortDrop=0; shortDrop<3; shortDrop++) {
+        await run(controller,"Object.defineProperty(shortCall.peerConnection,'connectionState',{configurable:true,value:'disconnected'});shortCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));");
+        await delay(150);
+        await run(controller,"Object.defineProperty(shortCall.peerConnection,'connectionState',{configurable:true,value:'connected'});shortCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));");
+        await wait(controller,"document.getElementById('video-wait').hidden");
+        assert.equal(hostState.session.videoKey,keyBeforeRecovery,'short interruptions must not exhaust the full-rebuild budget');
+      }
+      console.log(
+        'E2E live channel: blocked reliable queue, stationary pointer heartbeat, transient recovery without rebuild',
+      );
       await run(
         controller,
         "window.interruptedCall=Object.values(testPeer.connections).flat().find(c=>c.type==='media');Object.defineProperty(interruptedCall.peerConnection,'connectionState',{configurable:true,value:'disconnected'});interruptedCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));",
@@ -315,12 +377,10 @@ app
       );
       await wait(
         host,
-        'adaptivePc.getSenders().some(s=>s.getParameters().encodings?.[0]?.maxBitrate===1700000 && s.getParameters().encodings?.[0]?.maxFramerate===30)',
+        'adaptivePc.getSenders().some(s=>s.getParameters().encodings?.[0]?.maxBitrate===24000000 && s.getParameters().encodings?.[0]?.maxFramerate===30)',
       );
       await run(host, 'adaptivePc.getStats=realStats;');
-      console.log(
-        'E2E adaptive sender: simulated low bandwidth/CPU evidence applied to real encoder',
-      );
+      console.log('E2E adaptive sender: CPU adaptation without a self-throttling bitrate ceiling');
       await run(
         controller,
         "document.getElementById('quality').value='detail';document.getElementById('quality').dispatchEvent(new Event('change'));",
@@ -629,6 +689,9 @@ app
         video: '640x360 → 800x600 actual WebRTC',
         namedPeerCursor: true,
         responsiveCursorTelemetry: true,
+        independentRealtimeLane: true,
+        stationaryPointerHeartbeat: true,
+        shortInterruptionResumesWithoutRebuild: true,
         viewOnlyPointerNoInput: true,
         textEncoderHint: true,
         fluid60FpsSenderTarget: true,

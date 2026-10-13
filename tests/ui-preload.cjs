@@ -1,8 +1,9 @@
 const { contextBridge } = require('electron');
 let session = null;
-const state = { inputs: [], writes: [], readCount: 0 };
+const state = { inputs: [], writes: [], readCount: 0, reports: [] };
 contextBridge.exposeInMainWorld('rkScreen', {
   info: async () => ({ name: 'Çalışma bilgisayarı', version: '1.0.0-beta.1' }),
+  saveDiagnostics: async (events) => {state.reports.push(events);return true;},
   sources: async () => [
     {
       id: 'screen:1',

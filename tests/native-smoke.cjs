@@ -1,4 +1,4 @@
-const { app, clipboard } = require('electron');
+const { app, clipboard, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const assert = require('node:assert/strict');
@@ -23,6 +23,53 @@ app.on('browser-window-created', (_event, win) => {
   win.show = () => {};
   win.webContents.once('did-finish-load', async () => {
     try {
+      dialog.showSaveDialog = async () => ({
+        canceled: false,
+        filePath: path.join(root, 'review/native-diagnostics.json'),
+      });
+      const relayChecks = await win.webContents.executeJavaScript(`(async()=>{
+        const value={url:'turns:relay.example.invalid:443?transport=tcp',username:'native-test',password:'test-only-relay-password'};
+        await rkScreen.saveConnectionSettings(value);
+        const masked=await rkScreen.connectionSettings();
+        const config=await rkScreen.connectionConfig();
+        const encryptedRoundTrip=config.iceServers.at(-1).credential===value.password;
+        const passwordMasked=masked.hasPassword===true&&!('password' in masked)&&!('encrypted' in masked);
+        await rkScreen.compatibility(false);
+        const preferencePreserved=(await rkScreen.connectionSettings()).url===value.url;
+        await rkScreen.saveConnectionSettings({...value,password:''});
+        return {encryptedRoundTrip,passwordMasked,preferencePreserved};
+      })()`);
+      assert.deepEqual(relayChecks, {
+        encryptedRoundTrip: true,
+        passwordMasked: true,
+        preferencePreserved: true,
+      });
+      const runtimeText = await fs.readFile(
+        path.join(root, 'review/native-test-profile/runtime.json'),
+        'utf8',
+      );
+      assert.equal(
+        runtimeText.includes('test-only-relay-password'),
+        false,
+        'relay password must not be stored in plaintext',
+      );
+      await win.webContents.executeJavaScript(
+        "rkScreen.saveConnectionSettings({url:'',username:'',password:''})",
+      );
+      await win.webContents.executeJavaScript(
+        "rkScreen.saveDiagnostics([{event:'receive',fps:30,ip:'192.0.2.1',name:'private-device',credential:'private-credential',chat:'private-chat'}])",
+      );
+      const diagnosticText = await fs.readFile(
+        path.join(root, 'review/native-diagnostics.json'),
+        'utf8',
+      );
+      for (const privateValue of [
+        '192.0.2.1',
+        'private-device',
+        'private-credential',
+        'private-chat',
+      ])
+        assert.equal(diagnosticText.includes(privateValue), false);
       const result = await win.webContents.executeJavaScript(`(async()=>{
         const info=await rkScreen.info();
         const sources=await rkScreen.sources();
@@ -91,7 +138,7 @@ app.on('browser-window-created', (_event, win) => {
         path.join(root, 'review', 'native-results.json'),
         JSON.stringify(result, null, 2),
       );
-      console.log('NATIVE PASS', JSON.stringify(result));
+      console.log('NATIVE PASS', JSON.stringify({ ...result, ...relayChecks }));
       app.exit(0);
     } catch (err) {
       console.error(err);

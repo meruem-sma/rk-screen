@@ -13,6 +13,7 @@
     <script src="src/core/session.js" defer></script>
     <script src="src/core/video.js" defer></script>
     <script src="src/core/transport.js" defer></script>
+    <script src="src/core/diagnostics.js" defer></script>
     <script src="src/renderer.js" defer></script>
   </head>
   <body>
@@ -66,7 +67,7 @@
         </button>
         <div class="sidebar-bottom">
           <div class="company">RK Softworks</div>
-          <span id="app-version">Sürüm 1.0.0-beta.1</span
+          <span id="app-version">Sürüm 1.0.0-beta.2</span
           ><button class="text-button" id="about-button">RK Screen hakkında <span>↗</span></button>
         </div>
       </aside>
@@ -230,11 +231,40 @@
                 ><small>Bu bilgisayarda saklanan son cihazları kaldırın.</small></span
               ><button class="button small" id="clear-recents">Geçmişi temizle</button>
             </div>
+            <div class="setting-row">
+              <span
+                ><strong>Bağlantı raporu</strong
+                ><small
+                  >Hata ve kalite ölçümlerini kaydedin. Ekran, sohbet, IP adresi ve cihaz kimliği
+                  içermez.</small
+                ></span
+              >
+              <button class="button small" id="report-settings">Rapor kaydet</button>
+            </div>
           </section>
           <p class="settings-note">
-            Kimlik ve tercihler bu bilgisayarda tutulur. Bağlantı kurulurken PeerJS ve STUN/TURN
-            hizmetleri kullanılır. Hizmetlerin erişilebilirliği bağlantıyı etkileyebilir.
+            Kimlik ve tercihler bu bilgisayarda tutulur. Bağlantı kurulurken PeerJS, STUN ve
+            ayarlanmışsa aktarma hizmeti kullanılır. Hizmetlerin erişilebilirliği bağlantıyı
+            etkileyebilir.
           </p>
+          <details class="settings-note">
+            <summary>Aktarma sunucusu · İsteğe bağlı</summary>
+            <p>
+              Doğrudan bağlanamayan ağlar için geçerli sunucu bilgisi gerekir. Oturum açıkken
+              değiştirilemez. Parola Windows ile şifrelenerek bu bilgisayarda saklanır.
+            </p>
+            <label for="relay-url">Sunucu adresi</label
+            ><input
+              id="relay-url"
+              placeholder="turns:sunucu:443?transport=tcp"
+              autocomplete="off"
+            />
+            <label for="relay-user">Kullanıcı adı</label
+            ><input id="relay-user" autocomplete="off" /> <label for="relay-password">Parola</label
+            ><input id="relay-password" type="password" autocomplete="off" />
+            <button class="button small" id="relay-save">Kaydet</button>
+            <p>Alanları temizleyerek yalnızca doğrudan bağlantıyı kullanabilirsiniz.</p>
+          </details>
         </main>
         <footer class="footer">
           <span>Kullanıcı onayıyla ekran paylaşımı</span
@@ -310,11 +340,16 @@
           ><span id="remote-cursor" class="remote-cursor" hidden
             ><span class="cursor-arrow">➤</span><span id="cursor-name" class="cursor-name"></span
           ></span>
+          <span id="self-cursor" class="remote-cursor self-cursor" hidden
+            ><span class="cursor-arrow">➤</span
+            ><span id="self-cursor-name" class="cursor-name"></span
+          ></span>
         </div>
         <div class="video-wait" id="video-wait">Karşı bilgisayarın görüntüsü bekleniyor…</div>
       </div>
       <div class="session-foot">
         <span id="quality-status" role="status">Görüntü bilgisi bekleniyor</span>
+        <button class="text-button" id="report-session">Rapor kaydet</button>
         <span>Yerel fare kullanıldığında öncelik karşı bilgisayardadır.</span
         ><label class="check"><input id="session-clipboard" type="checkbox" />Metin panosu</label>
       </div>
@@ -382,7 +417,7 @@
         Her iki cihazda RK Screen 0.7 sürümü gerekir. Önceki sürümlerle oturum kurulmaz. Görüntü
         performansı donanıma ve ağa bağlıdır.
       </p>
-      <div class="info-signature">RK Softworks <span>1.0.0-beta.1</span></div>
+      <div class="info-signature">RK Softworks <span>1.0.0-beta.2</span></div>
     </dialog>
     <aside id="chat-panel" class="chat-panel" hidden>
       <div class="dialog-heading">

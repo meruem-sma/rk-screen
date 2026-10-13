@@ -86,5 +86,5 @@ test('Text quality keeps resolution, scales bandwidth for 4K and bounds FPS', ()
   assert.equal(qualitySettings('detail', 3840, 2160).bitrate, 40000000);
   assert.equal(qualitySettings('balanced').degradation, 'maintain-resolution');
   assert.equal(qualitySettings('detail').fps, 30);
-  assert.equal(qualitySettings('speed').degradation, 'maintain-framerate');
+  assert.equal(qualitySettings('speed').degradation, 'maintain-resolution');
 });

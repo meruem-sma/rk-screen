@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cleanName, overlayGeometry } = require('../src/core/pointer');
+const { cleanName, overlayGeometry, CursorOwnership } = require('../src/core/pointer');
 const { qualitySettings } = require('../src/core/video');
 const { validMessage } = require('../src/core/session');
 test('Named pointer fits negative-position and scaled display bounds at every corner', () => {
@@ -20,6 +20,37 @@ test('Named pointer fits negative-position and scaled display bounds at every co
       }
   assert.equal(cleanName('Enes\n\u202eRK'), 'EnesRK');
   assert.equal(cleanName('a'.repeat(100)).length, 48);
+});
+
+test('Remote injection preserves the separate local pointer and stale moves cannot undo a click', () => {
+  const c = new CursorOwnership();
+  c.observe({ x: 50, y: 80 }, 0);
+  c.recordInjected({ x: 500, y: 600 });
+  c.observe({ x: 500, y: 600 }, 20);
+  assert.deepEqual(c.local, { x: 50, y: 80 });
+  c.observe({ x: 503, y: 600 }, 40);
+  assert.deepEqual(c.local, { x: 503, y: 600 });
+  assert.equal(c.localUntil, 390);
+  assert.equal(c.acceptMove(1), true);
+  c.recordButton(5);
+  assert.equal(c.acceptMove(4), false);
+  assert.equal(c.acceptMove(6), true);
+  assert.equal(c.acceptMove(NaN), false);
+});
+
+test('Motion profile preserves readable resolution at the low-bandwidth stage', () => {
+  const { AdaptiveQuality } = require('../src/core/transport');
+  const a = new AdaptiveQuality();
+  const p = qualitySettings('fluid', 1920, 1080);
+  for (let i = 0; i < 10; i++) a.update(p, { available: 750000, limitation: 'bandwidth' });
+  const limits = a.limits(p);
+  assert.equal(limits.bitrate, 24000000);
+  assert.equal(limits.scale, 1.5);
+  assert.equal(1080 / limits.scale, 720);
+  assert.equal(limits.degradation, 'maintain-resolution');
+  assert.equal(qualitySettings('speed', 640, 360).scale, 1);
+  for (let i = 0; i < 5; i++) a.update(p, { limitation: 'none' });
+  assert.equal(a.limits(p).scale, 1);
 });
 test('Pointer and video telemetry require the current format and bounded dimensions', () => {
   const videoKey = '11111111-1111-4111-8111-111111111111';

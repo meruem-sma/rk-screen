@@ -60,38 +60,27 @@
       this.reset();
     }
     reset() {
-      this.bitrate = null;
       this.fps = null;
-      this.low = 0;
-      this.good = 0;
+      this.network = 0;
+      this.networkGood = 0;
+      this.networkLimited = false;
       this.cpu = 0;
       this.cpuGood = 0;
     }
     update(profile, sample) {
       const before = this.limits(profile);
-      const available = sample.available;
-      const floor = Math.min(750000, profile.bitrate);
-      if (finite(available) && available > 0) {
-        const desired = Math.max(floor, Math.min(profile.bitrate, Math.round(available * 0.85)));
-        if (desired < before.bitrate * 0.8) {
-          this.good = 0;
-          if (++this.low >= 2) {
-            this.bitrate = desired;
-            this.low = 0;
-          }
-        } else if (desired > before.bitrate * 1.05) {
-          this.low = 0;
-          if (++this.good >= 5) {
-            this.bitrate = Math.min(profile.bitrate, desired, Math.round(before.bitrate * 1.15));
-            this.good = 0;
-          }
-        } else {
-          this.low = 0;
-          this.good = 0;
-        }
+      // availableOutgoingBitrate is the transport's congestion estimate, not
+      // an independent link speed. Re-capping to 85% of it creates a feedback
+      // ratchet that suppresses probing. Leave bitrate control to WebRTC.
+      if (sample.limitation === 'bandwidth') {
+        this.networkGood = 0;
+        if (++this.network >= 5) this.networkLimited = true;
+      } else if (sample.limitation === 'none') {
+        this.network = 0;
+        if (++this.networkGood >= 5) this.networkLimited = false;
       } else {
-        this.low = 0;
-        this.good = 0;
+        this.network = 0;
+        this.networkGood = 0;
       }
       if (sample.limitation === 'cpu') {
         this.cpuGood = 0;
@@ -110,13 +99,21 @@
         this.cpuGood = 0;
       }
       const after = this.limits(profile);
-      return before.bitrate !== after.bitrate || before.fps !== after.fps;
+      return before.fps !== after.fps || before.scale !== after.scale;
     }
     limits(profile) {
       return {
         ...profile,
-        bitrate: Math.min(profile.bitrate, this.bitrate ?? profile.bitrate),
-        fps: Math.min(profile.fps, this.fps ?? profile.fps),
+        bitrate: profile.bitrate,
+        fps: Math.min(profile.fps, this.fps ?? profile.fps, this.networkLimited ? 30 : profile.fps),
+        ...(profile.maxScale
+          ? {
+              scale:
+                this.networkLimited && profile.allowScale
+                  ? Math.min(1.5, profile.maxScale)
+                  : profile.scale || 1,
+            }
+          : {}),
       };
     }
   }
@@ -131,5 +128,82 @@
       return true;
     }
   }
-  return { selectedRoute, receiveSample, AdaptiveQuality, RecoveryBudget };
+  class RealtimeLane {
+    constructor(pc, receive) {
+      this.pc = pc;
+      this.receive = receive;
+      this.channel = null;
+      this.sent = 0;
+      this.seen = new Map();
+      if (!pc) return;
+      this.previous = pc.ondatachannel;
+      this.handler = (event) => {
+        if (event.channel.label === 'rk-screen-live-v8') this.attach(event.channel);
+        else this.previous?.call(pc, event);
+      };
+      pc.ondatachannel = this.handler;
+    }
+    attach(channel) {
+      if (this.channel || channel.ordered || channel.maxRetransmits !== 0) {
+        channel.close();
+        return;
+      }
+      this.channel = channel;
+      channel.onmessage = (event) => {
+        if (typeof event.data !== 'string' || event.data.length > 2048) return;
+        try {
+          const m = JSON.parse(event.data);
+          if (
+            !['mouse-move', 'pointer', 'cursor'].includes(m.type) ||
+            !Number.isSafeInteger(m.liveSequence) ||
+            m.liveSequence <= (this.seen.get(m.type) || 0)
+          )
+            return;
+          this.seen.set(m.type, m.liveSequence);
+          this.receive(m);
+        } catch {}
+      };
+    }
+    start() {
+      if (this.pc && !this.channel)
+        this.attach(
+          this.pc.createDataChannel('rk-screen-live-v8', { ordered: false, maxRetransmits: 0 }),
+        );
+    }
+    send(message) {
+      if (this.channel?.readyState !== 'open') return false;
+      // Discard obsolete motion rather than queueing it behind chat/files.
+      if (this.channel.bufferedAmount < 8192)
+        this.channel.send(JSON.stringify({ ...message, liveSequence: ++this.sent }));
+      return true;
+    }
+    close() {
+      if (this.pc && this.pc.ondatachannel === this.handler) this.pc.ondatachannel = this.previous;
+      if (this.channel) {
+        this.channel.onmessage = null;
+        this.channel.close();
+      }
+      this.channel = null;
+      this.pc = null;
+    }
+  }
+  class RetryBackoff {
+    constructor() {
+      this.attempt = 0;
+    }
+    reset() {
+      this.attempt = 0;
+    }
+    next() {
+      return Math.min(30000, 1000 * 2 ** Math.min(this.attempt++, 5));
+    }
+  }
+  return {
+    selectedRoute,
+    receiveSample,
+    AdaptiveQuality,
+    RecoveryBudget,
+    RealtimeLane,
+    RetryBackoff,
+  };
 });

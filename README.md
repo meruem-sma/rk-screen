@@ -1,8 +1,12 @@
-# RK Screen 1.0.0-beta.1
+# RK Screen 1.0.0-beta.2
 
 Windows 64 bit için Türkçe ekran paylaşımı ve uzaktan destek uygulaması. Electron, PeerJS, WebRTC ve Koffi kullanır. Koyu, sade arayüzde marka logosu bulunmaz.
 
-Kaynak kodu MIT lisansıyla açıktır. [İndirme deposu](https://github.com/meruem-sma/rk-screen-downloads) ve [ürün sitesi](https://rkscreen.com.tr/) ayrı tutulur. Mevcut Beta 1 EXE **imzasızdır** ve Windows tarafından engellenebilir. Açık kaynak geçişi dosyayı otomatik imzalamaz.
+Kaynak kodu MIT lisansıyla açıktır. [İndirme deposu](https://github.com/meruem-sma/rk-screen-downloads) ve [ürün sitesi](https://rkscreen.com.tr/) ayrı tutulur. Mevcut Beta 2 setup **imzasızdır** ve Windows tarafından engellenebilir. Açık kaynak geçişi dosyayı otomatik imzalamaz.
+
+Beta 2, bit hızının düşük değere takılmasını önleyen kalite değişiklikleri, ayrı hızlı fare kanalı, iki tarafın bağımsız görsel işaretçileri, kısa kesintiden devam etme ve yerel bağlantı raporu içerir. [Düzeltmeler, testler ve dış ağ sınırları](BETA2-IYILESTIRMELER.md).
+
+Beta 2 şu an geliştirme adayıdır: yerel Windows Uygulama Denetimi yeni setup'ı başlatmayı engelledi. Bu yüzden herkese açık indirme Beta 1'de tutulur; yeni aday için kurulum/açılış kabulü tamamlanmış değildir. Kaynak sürümü mevcut geliştirme ortamında test edilebilir.
 
 ## Code signing policy
 
@@ -10,7 +14,7 @@ Kaynak kodu MIT lisansıyla açıktır. [İndirme deposu](https://github.com/mer
 
 ## Kullanım
 
-1. **İki bilgisayarda da 1.0.0-beta.1 sürümünü açın.** Yeni toparlanma davranışı iki güncel uçla test edilmiştir. 0.6.0 ve önceki sürümlerle oturum kurulmaz.
+1. **İki bilgisayarda da 1.0.0-beta.2 sürümünü açın.** Protokol 8 kullanılır; Beta 1 ve önceki sürümlerle oturum kurulmaz.
 2. Karşı bilgisayarın dokuz haneli kimliğini girin. Ekranını paylaşan kişi isteği ve paylaşılacak ekranı onaylasın. Görünen cihaz adı karşı tarafın bildirdiği addır; doğrulanmış kimlik değildir.
 3. Fare/klavye, pano ve sistem sesi ayrı izinlerdir; başlangıçta kapalıdır.
 4. Kontrol izni verildiyse araç çubuğunda **Fare ve klavye** seçin ve uzak ekrana tıklayın. **Yalnızca izle** seçiliyken girdi gönderilmez. Üst durum yazısı etkin modu gösterir.
@@ -20,7 +24,7 @@ Kaynak kodu MIT lisansıyla açıktır. [İndirme deposu](https://github.com/mer
 8. Paylaşan bilgisayarda **Ekran değiştir** ile başka monitörü önizleyip **Bu ekranı paylaş** seçin. Sohbet ve dosya aktarımı aynı oturumda devam eder.
 9. Her iki taraf bağlantıyı bitirebilir. Paylaşan taraf kontrol ve pano iznini sonradan kaldırabilir. Ayarlardan gelen yeni istekler kapatılabilir.
 
-## 1.0.0-beta.1 değişiklikleri
+## Önceki sürümün (Beta 1) değişiklikleri
 
 - Görüntü bağlantısı kesildiğinde, veri oturumu açıksa kontrol güvenle bekletilir ve dört saniye sonra görüntü yeniden kurulur. Bir dakikada en fazla iki otomatik deneme yapılır. Yeni görüntü gelmeden kontrol açılmaz. Veri kanalı da kapanırsa yeniden onaylı bağlantı gerekir.
 - Ağ kapasitesi iki ardışık ölçümde düşükse bit hızı tavanı düşer; beş iyi ölçümden sonra %15 adımlarla yükselir. Chromium'un kendi ağ kontrolü çalışmaya devam eder.
@@ -100,7 +104,7 @@ npm run release
 
 `release`, birim/arayüz/yerel bağlantı/açılış/işaretçi penceresi testlerini çalıştırır; ardından Windows kurulum paketini üretir, paket içeriğini kontrol eder, güvenilir imzalama kimliğiyle imzalar ve eski sürümleri temizler. Yeni sürüm hazırlanırken `package.json` sürümü, kilit dosyası ve çıktı klasörü birlikte güncellenmelidir. `npm run dist` yalnızca paketleme hattını çalıştırır; testleri ayrıca çalıştırmak gerekir.
 
-Çıktılar `dist/1.0.0-beta.1/` içindedir: kurulum EXE, `SHA256SUMS.txt` ve `release.json`. Temizlik sadece bu ürüne ait olduğu doğrulanan daha eski dağıtım klasörlerine uygulanır; kaynak ve kullanıcı verilerine uygulanmaz. Bu işlem kullanıcının bilgisayarında kurulu uygulamayı uzaktan güncellemez. İmzalı otomatik güncelleme ayrı bir geliştirme aşamasıdır.
+Çıktılar `dist/1.0.0-beta.2/` içindedir: kurulum EXE, `SHA256SUMS.txt` ve `release.json`. Temizlik sadece bu ürüne ait olduğu doğrulanan daha eski dağıtım klasörlerine uygulanır; kaynak ve kullanıcı verilerine uygulanmaz. Bu işlem kullanıcının bilgisayarında kurulu uygulamayı uzaktan güncellemez. İmzalı otomatik güncelleme ayrı bir geliştirme aşamasıdır.
 
 Bakım sorumlusunun 6 Ekim 2026 talebiyle Beta 1 imzasız setup olarak sunulur. `npm run dist:setup:beta` yalnızca beta sürümleri için ayrı `review/setup-candidate/<sürüm>/` klasörüne imzasız aday üretir ve paket içeriğini doğrular. Normal imzalı yayın hattı değişmez. Adayın kurulumu ve açılması denenmeden, GitHub dosyası/özeti doğrulanmadan mevcut indirme değiştirilmez. Setup da Windows tarafından engellenebilir; bu yol imza sorununu çözmüş sayılmaz.
 
@@ -130,7 +134,7 @@ Gerçek iki fiziksel bilgisayarda klavye düzenleri, karma DPI/çoklu monitör, 
 
 ## İmzalama, yükseltme ve lisans
 
-Mevcut Beta 1 setup imzasızdır ve Windows Akıllı Uygulama Denetimi tarafından engellenebilir. Normal yayın derlemeleri imzalama kimliği yoksa durur; açıkça talep edilen imzasız beta adayı yukarıda açıklanan ayrı komutla oluşturulur. İç uygulama ve dış paket birlikte imzalanmalıdır. Sertifika kurulumu ve doğrulama adımları: [WINDOWS-IMZALAMA.md](WINDOWS-IMZALAMA.md).
+Mevcut Beta 2 setup imzasızdır ve Windows Akıllı Uygulama Denetimi tarafından engellenebilir. Normal yayın derlemeleri imzalama kimliği yoksa durur; açıkça talep edilen imzasız beta adayı yukarıda açıklanan ayrı komutla oluşturulur. İç uygulama ve dış paket birlikte imzalanmalıdır. Sertifika kurulumu ve doğrulama adımları: [WINDOWS-IMZALAMA.md](WINDOWS-IMZALAMA.md).
 
 Eski kurulumu güncelleyebilmek için dahili uygulama kimliği `com.rksoftworks.menzil` korunmuştur. Paketli uygulama varsa eski Menzil kullanıcı veri klasörünü ve mevcut tercih anahtarlarını kullanır. Bunlar görünür ürün adı değildir. Gerçek kurulumdan yükseltme döngüsü temiz Windows makinesinde ayrıca doğrulanmalıdır.
 

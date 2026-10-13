@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const { COPYFILE_EXCL } = require('node:fs').constants;
 const path = require('node:path');
 const crypto = require('node:crypto');
 const MAX_FILE_SIZE = 512 * 1024 * 1024;
@@ -69,7 +70,14 @@ class FileReceiver {
     for (let i = 0; i < 10000; i++) {
       const target = path.join(this.directory, i ? `${stem} (${i})${ext}` : f.name);
       try {
-        await fs.link(f.temp, target);
+        try {
+          await fs.link(f.temp, target);
+        } catch (err) {
+          if (!['EPERM', 'ENOTSUP', 'EXDEV', 'ENOSYS'].includes(err.code)) throw err;
+          // FAT/network/restricted folders may not support hard links.
+          // Exclusive copy still refuses to overwrite an existing file.
+          await fs.copyFile(f.temp, target, COPYFILE_EXCL);
+        }
         await fs.unlink(f.temp);
         this.active = null;
         return { name: path.basename(target), path: target };

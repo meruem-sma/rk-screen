@@ -9,7 +9,10 @@
   const pendingChats = new Map(),
     receivedChats = new Set();
   const gate = new SessionGate(),
-    PROTOCOL = 7;
+    PROTOCOL = 8;
+  let liveLane = null,
+    inputSequence = 0,
+    lastPointerSent = 0;
   let cursorTimer,
     pointerTimer,
     pendingPointer = null,
@@ -22,18 +25,28 @@
     activeSource = null,
     switchSources = [],
     switchRevision = 0;
-  const { selectedRoute, receiveSample, AdaptiveQuality, RecoveryBudget } =
-    window.RKScreenTransport;
+  const {
+    selectedRoute,
+    receiveSample,
+    AdaptiveQuality,
+    RecoveryBudget,
+    RealtimeLane,
+    RetryBackoff,
+  } = window.RKScreenTransport;
   const adaptive = new AdaptiveQuality();
+  const diagnostics = new window.RKScreenDiagnostics.Diagnostics();
+  const signalingRetry = new RetryBackoff();
   let recoveryTimer = null,
     recoveryBudget = new RecoveryBudget(),
     qualityWarning = false;
   const { profiles, qualitySettings, geometry, coordinates } = window.RKScreenVideo;
   let peer,
+    peerRevision = 0,
     token = null,
     stream = null,
     media = null,
     refreshingVideo = false,
+    restartingVideo = false,
     sources = [],
     name = 'Bu bilgisayar',
     deviceId = '',
@@ -59,7 +72,8 @@
     lastMouse = 0,
     lastCoords = { x: 0, y: 0 },
     pressedButtons = new Set(),
-    lastCursor = null;
+    lastCursor = null,
+    ownCursor = null;
   let transfer = null,
     fileWaiter = null,
     fileTimer = null,
@@ -112,6 +126,7 @@
     $('connect-message').classList.toggle('error', error);
   }
   function network(state, label) {
+    diagnostics.record('connection', { state });
     online = state === 'online';
     $('network-dot').className = 'status-dot ' + state;
     $('network-label').textContent =
@@ -134,6 +149,12 @@
     if (!conn?.open) return false;
     try {
       if (inputTypes.has(data.type)) data = { ...data, videoKey };
+      if (['mouse-move', 'mouse-button'].includes(data.type))
+        data = { ...data, sequence: ++inputSequence };
+      if (conn === gate.connection && ['mouse-move', 'cursor', 'pointer'].includes(data.type)) {
+        if (liveLane?.send(data)) return true;
+        if ((conn.dataChannel?.bufferedAmount || 0) > 16384) return false;
+      }
       conn.send(data);
       return true;
     } catch {
@@ -210,37 +231,67 @@
   function newDeviceId() {
     return String(100000000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000000));
   }
-  function initPeer() {
+  function reconnectSignaling(owner, initial = false) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(
+      () => {
+        if (peer !== owner || online) return;
+        if (owner.destroyed) {
+          if (!gate.connection) initPeer();
+          return;
+        }
+        try {
+          if (owner.disconnected) owner.reconnect();
+          else if (!gate.connection) {
+            initPeer();
+            return;
+          }
+        } catch {}
+        reconnectSignaling(owner);
+      },
+      initial ? 10000 : signalingRetry.next(),
+    );
+  }
+  async function initPeer() {
     if (!api) {
       network('offline', 'Arayüz önizlemesi');
       $('retry').hidden = true;
       return;
     }
     clearTimeout(reconnectTimer);
+    const revision = ++peerRevision;
     if (peer) {
       peer.removeAllListeners();
       peer.destroy();
     }
     network('waiting', 'Bağlantı hazırlanıyor');
-    peer = new Peer('rkscreen-v7-' + deviceId, {
-      debug: 0,
-      config: {
-        iceServers: [
-          { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
-          {
-            urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443?transport=tcp'],
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-        ],
-      },
+    let config;
+    try {
+      config = api.connectionConfig
+        ? await api.connectionConfig()
+        : {
+            iceServers: [
+              { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+            ],
+          };
+    } catch (err) {
+      network('offline', 'Bağlantı sunucusu ayarını kontrol edin');
+      toast(errorText(err), true);
+      return;
+    }
+    if (revision !== peerRevision) return;
+    peer = new Peer('rkscreen-v8-' + deviceId, { debug: 0, config });
+    const ownerPeer = peer;
+    reconnectSignaling(ownerPeer, true);
+    peer.on('open', () => {
+      if (peer !== ownerPeer) return;
+      clearTimeout(reconnectTimer);
+      signalingRetry.reset();
+      network('online', 'Bağlantıya hazır');
     });
-    peer.on('open', () => network('online', 'Bağlantıya hazır'));
     peer.on('disconnected', () => {
       network('offline', 'Bağlantı hizmetine erişilemiyor');
-      reconnectTimer = setTimeout(() => {
-        if (peer?.disconnected && !peer.destroyed) peer.reconnect();
-      }, 5000);
+      reconnectSignaling(ownerPeer);
     });
     peer.on('error', (err) => {
       if (err.type === 'unavailable-id') {
@@ -259,9 +310,13 @@
         );
         return;
       }
-      if (gate.connection && !gate.approved) cleanup();
-      network('offline', 'Bağlantı kurulamadı');
-      message('İnternet bağlantısını kontrol edin ve yeniden deneyin.', true);
+      if (['network', 'socket-error', 'socket-closed', 'server-error'].includes(err.type)) {
+        network('offline', 'Bağlantı hizmeti yeniden deneniyor');
+        reconnectSignaling(ownerPeer);
+      } else if (gate.connection && !gate.approved) {
+        cleanup();
+        message('Bağlantı kurulamadı. Karşı cihazın sürümünü ve ağı kontrol edin.', true);
+      } else if (err.type === 'webrtc' && media) scheduleVideoRecovery(media);
     });
     peer.on('connection', (conn) => {
       const refusal =
@@ -295,7 +350,7 @@
         if (gate.connection !== conn) return;
         $('incoming-name').textContent = connectedName + ' bağlanmak istiyor';
         $('incoming-id').textContent =
-          'Cihaz kimliği: ' + formatted(conn.peer.replace('rkscreen-v7-', ''));
+          'Cihaz kimliği: ' + formatted(conn.peer.replace('rkscreen-v8-', ''));
         $('allow-input').checked = false;
         $('allow-clipboard').checked = prefs.clipboard;
         $('allow-audio').checked = false;
@@ -370,12 +425,13 @@
           track.onended = () => {
             if (media === call) scheduleVideoRecovery(call);
           };
-        saveRecent(call.peer.replace('rkscreen-v7-', ''), connectedName);
+        saveRecent(call.peer.replace('rkscreen-v8-', ''), connectedName);
       });
     });
   }
   function scheduleVideoRecovery(call) {
     if (media !== call || !gate.approved || !gate.connection?.open) return;
+    diagnostics.record('recovery');
     if (gate.role === 'controller') {
       if (!refreshingVideo) {
         prepareControllerVideo();
@@ -383,14 +439,11 @@
       }
       return;
     }
-    if (hostVideoPending || recoveryTimer) return;
-    if (!recoveryBudget.take(Date.now())) {
-      cleanup('Görüntü bağlantısı tekrar tekrar kesiliyor. Ağı kontrol edip yeniden bağlanın.');
-      return;
-    }
+    if (restartingVideo || recoveryTimer) return;
     const owner = gate.connection,
       ownerToken = token,
       key = videoKey;
+    hostVideoPending = true;
     // Pause native input immediately, retaining the current capability until rebuild.
     api.videoState(ownerToken, { videoKey: key, displayId: activeSource.displayId }).catch(() => {
       if (gate.connection === owner && token === ownerToken)
@@ -399,8 +452,13 @@
     $('host-label').textContent = 'Bağlantı toparlanıyor · Kontrol beklemede';
     recoveryTimer = setTimeout(() => {
       recoveryTimer = null;
-      if (gate.connection === owner && media === call && videoKey === key)
+      if (gate.connection === owner && media === call && videoKey === key) {
+        if (!recoveryBudget.take(Date.now())) {
+          cleanup('Görüntü bağlantısı tekrar tekrar kesiliyor. Ağı kontrol edip yeniden bağlanın.');
+          return;
+        }
         restartHostVideo().catch(() => cleanup('Görüntü yeniden başlatılamadı.'));
+      }
     }, 4000);
   }
   function bindMedia(call) {
@@ -412,14 +470,40 @@
         applyQuality().catch(() => {});
     };
     pc?.addEventListener('signalingstatechange', reapply);
+    pc?.addEventListener('icecandidateerror', (event) => {
+      if (media === call) diagnostics.record('relay-error', { code: event.errorCode });
+    });
     pc?.addEventListener('connectionstatechange', () => {
       if (media !== call) return;
       if (['failed', 'disconnected', 'closed'].includes(pc.connectionState))
         scheduleVideoRecovery(call);
-      if (pc.connectionState === 'connected') reapply();
+      if (pc.connectionState === 'connected') {
+        reapply();
+        if (gate.role === 'controller' && refreshingVideo && $('remote-video').srcObject) {
+          const key = videoKey;
+          $('remote-video').requestVideoFrameCallback(() => {
+            if (
+              media !== call ||
+              videoKey !== key ||
+              !gate.approved ||
+              pc.connectionState !== 'connected'
+            )
+              return;
+            clearTimeout(connectTimer);
+            refreshingVideo = false;
+            $('refresh-video').disabled = false;
+            $('video-wait').hidden = true;
+            send({ type: 'video-visible', videoKey });
+            updateControlStatus();
+          });
+        }
+      }
     });
   }
   function bindConnection(conn) {
+    liveLane = new RealtimeLane(conn.peerConnection, (data) => {
+      if (gate.allows(conn)) handleData(conn, data).catch(() => {});
+    });
     conn.on('data', (data) =>
       handleData(conn, data).catch((err) => {
         if (gate.connection === conn) {
@@ -447,7 +531,7 @@
     }
     await ending;
     if (gate.connection) return;
-    const conn = peer.connect('rkscreen-v7-' + id, {
+    const conn = peer.connect('rkscreen-v8-' + id, {
       reliable: true,
       metadata: { version: PROTOCOL, name },
     });
@@ -455,7 +539,10 @@
     bindConnection(conn);
     refreshControls();
     message('Karşı bilgisayara bağlanılıyor…');
-    armTimeout(25000, 'Cihaza ulaşılamadı. Her iki cihazın çevrimiçi olduğundan emin olun.');
+    armTimeout(
+      25000,
+      'Cihaza ulaşılamadı. İki cihazın sürümünü ve çevrimiçi durumunu kontrol edin. Bazı ağlarda geçerli aktarma sunucusu gerekir.',
+    );
     conn.on('open', () => {
       if (gate.connection !== conn) return;
       message('Karşı tarafın onayı bekleniyor…');
@@ -530,7 +617,8 @@
   async function restartHostVideo(nextStream = stream, source = activeSource) {
     const owner = gate.connection,
       ownerToken = token;
-    if (!gate.approved || gate.role !== 'host' || hostVideoPending || !source) return false;
+    if (!gate.approved || gate.role !== 'host' || restartingVideo || !source) return false;
+    restartingVideo = true;
     clearTimeout(recoveryTimer);
     recoveryTimer = null;
     hostVideoPending = true;
@@ -540,6 +628,7 @@
       await api.videoState(ownerToken, { videoKey: nextKey, displayId: source.displayId });
       if (gate.connection !== owner || token !== ownerToken) return false;
       videoKey = nextKey;
+      adaptive.reset();
       activeSource = source;
       const previous = media;
       media = null;
@@ -559,6 +648,8 @@
     } catch (err) {
       if (gate.connection === owner) cleanup('Görüntü değiştirilemedi: ' + errorText(err));
       return false;
+    } finally {
+      if (gate.connection === owner) restartingVideo = false;
     }
   }
   async function chooseScreen() {
@@ -738,6 +829,7 @@
       videoKey = m.videoKey;
       connectedName = String(m.name || 'Uzak bilgisayar').slice(0, 80);
       $('cursor-name').textContent = connectedName;
+      $('self-cursor-name').textContent = name;
       remoteInput = m.input;
       remoteClipboard = m.clipboard;
       const newToken = await api.begin({
@@ -749,6 +841,7 @@
         return;
       }
       token = newToken;
+      liveLane?.start();
       $('session-clipboard').checked = prefs.clipboard;
       $('remote-name').textContent = connectedName;
       $('remote-session').hidden = false;
@@ -809,6 +902,8 @@
           if (await api.videoReady(ownerToken, videoKey)) {
             if (gate.connection !== conn || token !== ownerToken || m.videoKey !== videoKey) break;
             hostVideoPending = false;
+            clearTimeout(recoveryTimer);
+            recoveryTimer = null;
             clearTimeout(connectTimer);
             $('host-screen').disabled = false;
             $('host-label').textContent = connectedName + ' ekranınızı görüntülüyor';
@@ -880,6 +975,7 @@
         break;
       case 'quality':
         if (gate.role === 'host') {
+          if (quality !== m.value) adaptive.reset();
           quality = m.value;
           adaptive.reset();
           await applyQuality();
@@ -896,6 +992,7 @@
         break;
       case 'video-info':
         if (gate.role === 'controller' && m.videoKey === videoKey) {
+          diagnostics.record('video', { ...m, profile: quality });
           videoInfo = m;
           updateQualityStatus();
         }
@@ -950,7 +1047,7 @@
       const params = sender.getParameters();
       if (!params.encodings?.length) continue;
       for (const enc of params.encodings) {
-        enc.scaleResolutionDownBy = requested === 'speed' ? 1.5 : 1;
+        enc.scaleResolutionDownBy = p.scale;
         enc.maxBitrate = p.bitrate;
         enc.maxFramerate = p.fps;
       }
@@ -959,6 +1056,7 @@
     }
   }
   function qualityFailed() {
+    diagnostics.record('quality', { state: 'unsupported' });
     if (qualityWarning) return;
     qualityWarning = true;
     toast(
@@ -975,6 +1073,8 @@
     clearInterval(cursorTimer);
     clearInterval(pointerTimer);
     lastCursorPacket = '';
+    inputSequence = 0;
+    lastPointerSent = 0;
     lastPong = Date.now();
     adaptive.reset();
     recoveryBudget = new RecoveryBudget();
@@ -1001,12 +1101,13 @@
           gate.connection !== owner ||
           videoKey !== currentKey ||
           !p ||
-          (owner.dataChannel?.bufferedAmount || 0) > 65536
+          ((!liveLane?.channel || liveLane.channel.readyState !== 'open') &&
+            (owner.dataChannel?.bufferedAmount || 0) > 16384)
         )
           return;
         const signature = JSON.stringify(p);
         if (signature !== lastCursorPacket || Date.now() - lastCursorSent > 1000) {
-          send({ type: 'cursor', ...p, videoKey: currentKey });
+          if (!send({ type: 'cursor', ...p, videoKey: currentKey })) return;
           lastCursorPacket = signature;
           lastCursorSent = Date.now();
         }
@@ -1020,11 +1121,16 @@
         !pendingPointer ||
         gate.connection !== owner ||
         refreshingVideo ||
-        (owner.dataChannel?.bufferedAmount || 0) > 65536
+        ((!liveLane?.channel || liveLane.channel.readyState !== 'open') &&
+          (owner.dataChannel?.bufferedAmount || 0) > 16384)
       )
         return;
-      send({ type: 'pointer', ...pendingPointer, videoKey });
-      pendingPointer = null;
+      if (Date.now() - lastPointerSent > 750 || pendingPointer.changed) {
+        if (send({ type: 'pointer', ...pendingPointer, videoKey })) {
+          pendingPointer.changed = false;
+          lastPointerSent = Date.now();
+        }
+      }
     }, 40);
     let measuring = false;
     heartbeat = setInterval(async () => {
@@ -1062,6 +1168,19 @@
                 adaptive.update(profile, { ...route, limitation: r.qualityLimitationReason }) ||
                 changed;
               const effective = adaptive.limits(profile);
+              diagnostics.record('video', {
+                profile: quality,
+                limitation: r.qualityLimitationReason,
+                route: route.route || 'unknown',
+                rtt: route.rtt,
+                available: route.available,
+                sourceWidth: source.width,
+                sourceHeight: source.height,
+                sentWidth: r.frameWidth,
+                sentHeight: r.frameHeight,
+                targetFps: effective.fps,
+                maxBitrate: effective.bitrate,
+              });
               send({
                 type: 'video-info',
                 targetFps: effective.fps,
@@ -1080,6 +1199,11 @@
             }
             if (r.type === 'inbound-rtp' && r.kind === 'video') {
               const sample = receiveSample(r, oldStats);
+              diagnostics.record('receive', {
+                ...sample,
+                route: route.route || 'unknown',
+                rtt: route.rtt,
+              });
               $('stat-fps').textContent =
                 sample.fps === null ? '— FPS' : Math.round(sample.fps) + ' FPS';
               $('stat-rate').textContent =
@@ -1124,8 +1248,11 @@
     if (conn?.open && gate.approved) send({ type: 'bye' }, conn);
     releaseInput();
     gate.reset();
+    liveLane?.close();
+    liveLane = null;
     videoKey = null;
     hostVideoPending = false;
+    restartingVideo = false;
     activeSource = null;
     switchSources = [];
     switchRevision++;
@@ -1340,6 +1467,15 @@
       $('scale').value,
       window.devicePixelRatio,
     );
+    const ownVisible = !!(ownCursor?.visible && g && !refreshingVideo);
+    $('self-cursor').hidden = !ownVisible;
+    $('viewport').classList.toggle('viewport-pointer-active', ownVisible);
+    if (ownVisible) {
+      $('self-cursor').style.left = g.left + ownCursor.x * g.width + 'px';
+      $('self-cursor').style.top = g.top + ownCursor.y * g.height + 'px';
+      $('self-cursor').classList.toggle('label-left', ownCursor.x > 0.75);
+      $('self-cursor').classList.toggle('label-above', ownCursor.y > 0.8);
+    }
     if (!lastCursor?.visible || !g) {
       $('remote-cursor').hidden = true;
       return;
@@ -1357,7 +1493,10 @@
       pendingMouse = null;
       return;
     }
-    if ((gate.connection?.dataChannel?.bufferedAmount || 0) > 65536) {
+    if (
+      (!liveLane?.channel || liveLane.channel.readyState !== 'open') &&
+      (gate.connection?.dataChannel?.bufferedAmount || 0) > 16384
+    ) {
       mouseTimer = setTimeout(flushMouse, 16);
       return;
     }
@@ -1367,6 +1506,9 @@
     send({ type: 'mouse-move', ...p });
   }
   function releaseInput() {
+    ownCursor = null;
+    $('self-cursor').hidden = true;
+    $('viewport').classList.remove('viewport-pointer-active');
     pendingPointer = null;
     if (gate.approved && gate.role === 'controller' && videoKey)
       send({ type: 'pointer', x: 0, y: 0, visible: false, videoKey });
@@ -1382,7 +1524,9 @@
     viewport.addEventListener('pointermove', (e) => {
       if (!gate.approved || gate.role !== 'controller' || refreshingVideo) return;
       const p = coords(e, pressedButtons.size > 0);
-      pendingPointer = { ...(p || { x: 0, y: 0 }), visible: !!p };
+      ownCursor = { ...(p || { x: 0, y: 0 }), visible: !!p };
+      positionCursor();
+      pendingPointer = { ...(p || { x: 0, y: 0 }), visible: !!p, changed: true };
       if (!canControl()) return;
       if (!p) return;
       lastCoords = p;
@@ -1416,7 +1560,9 @@
     });
     viewport.addEventListener('pointercancel', releaseInput);
     viewport.addEventListener('pointerleave', () => {
-      pendingPointer = { x: 0, y: 0, visible: false };
+      ownCursor = null;
+      positionCursor();
+      pendingPointer = { x: 0, y: 0, visible: false, changed: true };
     });
     viewport.addEventListener('focus', updateControlStatus);
     viewport.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1701,6 +1847,35 @@
   for (const id of ['about-button', 'help-button'])
     on(id, 'click', () => $('info-dialog').showModal());
   on('close-info', 'click', () => $('info-dialog').close());
+  for (const id of ['report-settings', 'report-session'])
+    on(id, 'click', async () => {
+      if (await api?.saveDiagnostics(diagnostics.snapshot())) toast('Bağlantı raporu kaydedildi.');
+    });
+  if (api?.connectionSettings)
+    api
+      .connectionSettings()
+      .then((settings) => {
+        $('relay-url').value = settings.url;
+        $('relay-user').value = settings.username;
+        $('relay-password').placeholder = settings.hasPassword
+          ? 'Kaydedilmiş · Değiştirmek için yazın'
+          : '';
+      })
+      .catch(() => {});
+  on('relay-save', 'click', async () => {
+    if (!api) return;
+    await api.saveConnectionSettings({
+      url: $('relay-url').value,
+      username: $('relay-user').value,
+      password: $('relay-password').value,
+    });
+    $('relay-password').value = '';
+    $('relay-password').placeholder = $('relay-url').value
+      ? 'Kaydedilmiş · Değiştirmek için yazın'
+      : '';
+    toast('Bağlantı sunucusu ayarı kaydedildi.');
+    await initPeer();
+  });
   on('retry', 'click', () => {
     if (!gate.connection) initPeer();
     else toast('Yeniden denemek için mevcut oturumu bitirin.');

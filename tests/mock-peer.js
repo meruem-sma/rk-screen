@@ -38,7 +38,7 @@ class Call extends Emitter {
   constructor(id) {
     super();
     this.peer = id;
-    this.metadata = { version: 7 };
+    this.metadata = { version: 8 };
     this.peerConnection = {
       addEventListener() {},
       getSenders: () => [],
@@ -70,7 +70,7 @@ window.Peer = class extends Emitter {
     return c;
   }
   incoming(name = 'Destek bilgisayarı') {
-    const c = new Connection('rkscreen-v7-123456789', { version: 7, name });
+    const c = new Connection('rkscreen-v8-123456789', { version: 8, name });
     this.emit('connection', c);
     setTimeout(() => {
       c.open = true;
@@ -87,6 +87,7 @@ window.Peer = class extends Emitter {
     this.destroyed = true;
   }
   reconnect() {
+    this.disconnected = false;
     this.emit('open');
   }
 };

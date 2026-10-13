@@ -15,8 +15,12 @@
     return {
       ...p,
       bitrate: Math.round(p.bitrate * factor),
-      degradation:
-        name === 'speed' || name === 'fluid' ? 'maintain-framerate' : 'maintain-resolution',
+      // Bound resolution reductions ourselves; an FPS preference must not
+      // silently turn a 1080p desktop into unreadable 360p.
+      degradation: 'maintain-resolution',
+      maxScale: Math.max(1, Math.min(width, height) / 720),
+      allowScale: name === 'fluid' || name === 'speed',
+      scale: name === 'speed' ? Math.min(1.5, Math.max(1, Math.min(width, height) / 720)) : 1,
     };
   }
   function geometry(rect, width, height, mode, pixelRatio = 1) {

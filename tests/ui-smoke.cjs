@@ -39,6 +39,8 @@ app.whenReady().then(async () => {
   try {
     await win.loadFile(path.join(root, 'review', 'ui-fixture.html'));
     await wait("document.getElementById('network-label').textContent==='Bağlantıya hazır'");
+    await run("testPeer.disconnected=true;testPeer.emit('disconnected');");
+    await wait("document.getElementById('network-label').textContent==='Bağlantıya hazır'");
     await delay(150);
     await fs.writeFile(
       path.join(root, 'review', 'dashboard.png'),
@@ -145,16 +147,19 @@ app.whenReady().then(async () => {
     );
     await wait('window.testConnection?.open===true');
     await run(
-      "testConnection.emit('data',{type:'granted',version:7,videoKey:'11111111-1111-4111-8111-111111111111',name:'Tasarım bilgisayarı',input:true,clipboard:false});",
+      "testConnection.emit('data',{type:'granted',version:8,videoKey:'11111111-1111-4111-8111-111111111111',name:'Tasarım bilgisayarı',input:true,clipboard:false});",
     );
     await wait("!document.getElementById('remote-session').hidden");
+    await run("document.getElementById('report-session').click();");
+    await wait("rkScreen.testState().reports.length===1");
+    assert.ok((await run("rkScreen.testState().reports[0]")).every(e=>!('ip' in e)&&!('name' in e)));
     assert.equal(await run("testConnection.sent.some(m=>m.type==='ready')"), true);
     await run(
-      "window.wrongCall=new Call(testConnection.peer);wrongCall.metadata={version:7,videoKey:'22222222-2222-4222-8222-222222222222'};testPeer.emit('call',wrongCall);",
+      "window.wrongCall=new Call(testConnection.peer);wrongCall.metadata={version:8,videoKey:'22222222-2222-4222-8222-222222222222'};testPeer.emit('call',wrongCall);",
     );
     assert.equal(await run('wrongCall.closed'), true);
     await run(
-      "window.foreignCall=new Call('other-device');foreignCall.metadata={version:7,videoKey:'11111111-1111-4111-8111-111111111111'};testPeer.emit('call',foreignCall);",
+      "window.foreignCall=new Call('other-device');foreignCall.metadata={version:8,videoKey:'11111111-1111-4111-8111-111111111111'};testPeer.emit('call',foreignCall);",
     );
     assert.equal(await run('foreignCall.closed'), true);
     await delay(150);

@@ -6,6 +6,10 @@ const invoke =
 contextBridge.exposeInMainWorld('rkScreen', {
   info: invoke('app-info'),
   compatibility: invoke('compatibility'),
+  saveDiagnostics: invoke('save-diagnostics'),
+  connectionConfig: invoke('connection-config'),
+  connectionSettings: invoke('connection-settings'),
+  saveConnectionSettings: invoke('save-connection-settings'),
   sources: invoke('sources'),
   begin: invoke('session-begin'),
   end: invoke('session-end'),

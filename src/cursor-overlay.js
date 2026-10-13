@@ -48,7 +48,7 @@ class CursorOverlay {
     }
     this.pending = { ...overlayGeometry(bounds, point), name: cleanName(name) };
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.hide(), 1500);
+    this.timer = setTimeout(() => this.hide(), 3000);
     this.render();
   }
   render() {

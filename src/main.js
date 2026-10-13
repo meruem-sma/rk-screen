@@ -7,6 +7,7 @@ const {
   Menu,
   dialog,
   clipboard,
+  safeStorage,
   powerSaveBlocker,
 } = require('electron');
 const path = require('node:path');
@@ -16,7 +17,7 @@ const crypto = require('node:crypto');
 const { pathToFileURL } = require('node:url');
 const { FileReceiver, MAX_FILE_SIZE } = require('./core/file-store');
 const { validMessage, inputTypes, validVideoKey } = require('./core/session');
-const { cleanName } = require('./core/pointer');
+const { cleanName, CursorOwnership } = require('./core/pointer');
 const { CursorOverlay } = require('./cursor-overlay');
 const pointerOverlay = new CursorOverlay();
 // Keep existing installed users' local settings during the product rename.
@@ -167,7 +168,70 @@ handle('app-info', () => ({
 handle('compatibility', async (value) => {
   if (typeof value !== 'boolean') throw new Error('Geçersiz ayar.');
   await fs.mkdir(path.dirname(runtimeFile), { recursive: true });
-  await fs.writeFile(runtimeFile, JSON.stringify({ compatibility: value }));
+  runtime.compatibility = value;
+  await fs.writeFile(runtimeFile, JSON.stringify(runtime));
+});
+handle('connection-settings', () => ({
+  url: runtime.relay?.url || '',
+  username: runtime.relay?.username || '',
+  hasPassword: !!runtime.relay?.encrypted,
+}));
+handle('connection-config', () => {
+  const { directServers, validateRelay } = require('./core/ice');
+  if (!runtime.relay) return { iceServers: directServers };
+  const relay = validateRelay({
+    ...runtime.relay,
+    password: safeStorage.decryptString(Buffer.from(runtime.relay.encrypted, 'base64')),
+  });
+  return { iceServers: [...directServers, relay] };
+});
+handle('save-connection-settings', async (value) => {
+  if (session) throw Error('Sunucu ayarını değiştirmek için oturumu bitirin.');
+  const previous = runtime.relay;
+  let password = value?.password;
+  if (
+    password === '' &&
+    previous?.encrypted &&
+    value.url?.trim() === previous.url &&
+    value.username?.trim() === previous.username
+  )
+    password = safeStorage.decryptString(Buffer.from(previous.encrypted, 'base64'));
+  const relay = require('./core/ice').validateRelay({ ...value, password });
+  if (relay) {
+    if (!safeStorage.isEncryptionAvailable())
+      throw Error('Windows güvenli parola saklama hizmeti kullanılamıyor.');
+    runtime.relay = {
+      url: relay.urls[0],
+      username: relay.username,
+      encrypted: safeStorage.encryptString(relay.credential).toString('base64'),
+    };
+  } else delete runtime.relay;
+  await fs.mkdir(path.dirname(runtimeFile), { recursive: true });
+  await fs.writeFile(runtimeFile, JSON.stringify(runtime));
+  return true;
+});
+handle('save-diagnostics', async (events) => {
+  const safe = require('./core/diagnostics').sanitizeEvents(events);
+  const result = await dialog.showSaveDialog(win, {
+    title: 'Bağlantı raporunu kaydet',
+    defaultPath: path.join(app.getPath('downloads'), 'RK-Screen-baglanti-raporu.json'),
+    filters: [{ name: 'Bağlantı raporu', extensions: ['json'] }],
+  });
+  if (result.canceled || !result.filePath) return false;
+  await fs.writeFile(
+    result.filePath,
+    JSON.stringify(
+      {
+        version: app.getVersion(),
+        electron: process.versions.electron,
+        createdAt: new Date().toISOString(),
+        events: safe,
+      },
+      null,
+      2,
+    ),
+  );
+  return true;
 });
 handle('sources', async () => {
   const sources = await desktopCapturer.getSources({
@@ -204,15 +268,12 @@ handle('session-begin', async (options) => {
     remoteName: cleanName(options.remoteName),
     pointerEnabled: true,
     lastPointerTime: 0,
-    cursorOwner: 'host',
+    cursor: new CursorOwnership(),
     input: options.role === 'host' && options.input === true,
     inputPaused: true,
     videoKey: null,
     clipboard: options.clipboard === true,
     display,
-    lastCursor: null,
-    injected: null,
-    localUntil: 0,
   };
   powerBlocker = powerSaveBlocker.start('prevent-display-sleep');
   return token;
@@ -231,12 +292,13 @@ handle('video-state', (token, options) => {
   s.inputPaused = true;
   pointerOverlay.hide();
   injector?.releaseAll();
+  const sameDisplay = s.display?.id === display.id;
+  const changedVideoKey = s.videoKey !== options.videoKey;
   s.display = display;
   s.videoKey = options.videoKey;
-  s.lastCursor = null;
-  s.injected = null;
-  s.localUntil = 0;
-  s.cursorOwner = 'host';
+  if (!sameDisplay) s.cursor = new CursorOwnership();
+  if (changedVideoKey) s.cursor.sequence = 0;
+  s.cursor.observe(screen.dipToScreenPoint(screen.getCursorScreenPoint()), Date.now());
 });
 handle('pointer-enabled', (token, enabled) => {
   const s = authorized(token);
@@ -297,15 +359,7 @@ handle('input', (token, data) => {
     injector.releaseAll();
     return true;
   }
-  const pt = injector.position();
-  if (
-    pt &&
-    s.lastCursor &&
-    (pt.x !== s.lastCursor.x || pt.y !== s.lastCursor.y) &&
-    (!s.injected || Math.abs(pt.x - s.injected.x) > 4 || Math.abs(pt.y - s.injected.y) > 4)
-  )
-    s.localUntil = Date.now() + 350;
-  s.lastCursor = pt;
+  s.cursor.observe(injector.position(), Date.now());
   const b = s.display.bounds;
   const dip = {
     x: b.x + Math.round((b.width - 1) * (data.x || 0)),
@@ -313,23 +367,20 @@ handle('input', (token, data) => {
   };
   const physical = screen.dipToScreenPoint(dip);
   if (data.type === 'mouse-move') {
-    if (Date.now() < s.localUntil) return false;
+    if (!s.cursor.acceptMove(data.sequence) || Date.now() < s.cursor.localUntil) return false;
     injector.moveMouse(physical.x, physical.y);
-    s.injected = injector.position() || physical;
-    s.lastCursor = s.injected;
-    s.cursorOwner = 'controller';
+    s.cursor.recordInjected(injector.position() || physical);
   } else if (data.type === 'mouse-button') {
-    if (data.pressed && Date.now() < s.localUntil) return false;
-    const localActive = Date.now() < s.localUntil;
+    s.cursor.recordButton(data.sequence);
+    if (data.pressed && Date.now() < s.cursor.localUntil) return false;
+    const localActive = Date.now() < s.cursor.localUntil;
     injector.mouseButton(
       data.button,
       data.pressed,
       localActive ? undefined : physical.x,
       localActive ? undefined : physical.y,
     );
-    s.injected = injector.position() || physical;
-    s.lastCursor = s.injected;
-    if (!localActive) s.cursorOwner = 'controller';
+    if (!localActive) s.cursor.recordInjected(injector.position() || physical);
   } else if (data.type === 'mouse-wheel') injector.mouseWheel(data.dx, data.dy);
   else if (data.type === 'key') injector.keyEvent(data.code, data.pressed);
   else if (data.type === 'text') injector.text(data.text);
@@ -338,30 +389,15 @@ handle('input', (token, data) => {
 handle('cursor', (token) => {
   const s = authorized(token);
   if (s.role !== 'host') return null;
-  const p = screen.getCursorScreenPoint(),
-    b = s.display.bounds;
-  const physical = screen.dipToScreenPoint(p);
-  if (
-    s.lastCursor &&
-    (Math.abs(physical.x - s.lastCursor.x) > 4 || Math.abs(physical.y - s.lastCursor.y) > 4) &&
-    (!s.injected ||
-      Math.abs(physical.x - s.injected.x) > 4 ||
-      Math.abs(physical.y - s.injected.y) > 4)
-  ) {
-    s.localUntil = Date.now() + 350;
-    s.cursorOwner = 'host';
-  }
-  s.lastCursor = physical;
+  const b = s.display.bounds;
+  s.cursor.observe(screen.dipToScreenPoint(screen.getCursorScreenPoint()), Date.now());
+  const p = s.cursor.local ? screen.screenToDipPoint(s.cursor.local) : null;
+  if (!p) return { x: 0, y: 0, visible: false };
   return {
     x: Math.max(0, Math.min(1, (p.x - b.x) / b.width)),
     y: Math.max(0, Math.min(1, (p.y - b.y) / b.height)),
     visible:
-      !s.inputPaused &&
-      s.cursorOwner === 'host' &&
-      p.x >= b.x &&
-      p.y >= b.y &&
-      p.x < b.x + b.width &&
-      p.y < b.y + b.height,
+      !s.inputPaused && p.x >= b.x && p.y >= b.y && p.x < b.x + b.width && p.y < b.y + b.height,
   };
 });
 handle('clipboard-read', async (token) => {

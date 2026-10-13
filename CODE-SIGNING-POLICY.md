@@ -1,6 +1,6 @@
 # Code signing policy
 
-RK Screen is maintained by [meruem-sma](https://github.com/meruem-sma) under the MIT license. The current public Beta 1 EXE is unsigned. Free SignPath Foundation signing is being investigated; no application approval or production certificate is claimed.
+RK Screen is maintained by [meruem-sma](https://github.com/meruem-sma) under the MIT license. Beta 2 setup is unsigned. Free SignPath Foundation signing is being investigated; no application approval or production certificate is claimed.
 
 Authors, reviewers and release approvers: [meruem-sma](https://github.com/meruem-sma). External contributions must be reviewed before merging. Each signed release must be manually approved by the maintainer. Multi-factor authentication is required for the maintainer's GitHub and SignPath accounts before signing is enabled; its configuration must be confirmed by the account owner.
 
