@@ -62,6 +62,81 @@ test('Blocked Windows input is reported and failed releases remain retryable', (
   input.releaseAll();
   assert.equal(input.keys.size, 0);
 });
+test('AltGr Unicode temporarily releases and restores only remotely owned modifiers', () => {
+  const packets = [];
+  const input = new InputInjector({ send: (p) => (packets.push(...p), p.length) });
+  input.keyEvent('ControlLeft', true);
+  input.keyEvent('AltRight', true);
+  input.keyEvent('KeyC', true);
+  packets.length = 0;
+  input.text('@ş');
+  assert.deepEqual(
+    packets.map((p) => [p.readUInt16LE(10), p.readUInt32LE(12)]),
+    [
+      [29, 10],
+      [56, 11],
+      [64, 4],
+      [64, 6],
+      [351, 4],
+      [351, 6],
+      [29, 8],
+      [56, 9],
+    ],
+  );
+  assert.deepEqual([...input.keys], ['KeyC', 'ControlLeft', 'AltRight']);
+  packets.length = 0;
+  input.releaseAll();
+  input.text('İ');
+  assert.deepEqual(
+    packets.slice(-2).map((p) => p.readUInt32LE(12)),
+    [4, 6],
+  );
+  assert.ok(!packets.some((p) => p.readUInt16LE(10) === 42));
+});
+test('Unicode failure restores modifiers and partial release failure restores earlier releases', () => {
+  let fail = () => false;
+  const input = new InputInjector({ send: (p) => (fail(p) ? 0 : p.length) });
+  input.keyEvent('ControlLeft', true);
+  input.keyEvent('AltRight', true);
+  fail = (p) => p[0].readUInt32LE(12) === 4;
+  assert.throws(() => input.text('@'), /Windows/);
+  assert.deepEqual([...input.keys], ['ControlLeft', 'AltRight']);
+  fail = (p) => p[0].readUInt32LE(12) === 11;
+  assert.throws(() => input.text('@'), /Windows/);
+  assert.equal(input.keys.has('ControlLeft'), true);
+  assert.equal(input.keys.has('AltRight'), true);
+  fail = () => false;
+  input.releaseAll();
+  assert.equal(input.keys.size, 0);
+});
+test('Lost connection releases held inputs; heartbeats keep legitimate long holds alive', () => {
+  let now = 0,
+    blocked = false;
+  const packets = [];
+  const input = new InputInjector(
+    { send: (p) => (blocked ? 0 : (packets.push(...p), p.length)), move: () => true },
+    () => now,
+  );
+  input.keyEvent('ShiftLeft', true);
+  input.mouseButton('left', true);
+  now = 5000;
+  assert.equal(input.releaseExpired(), false);
+  input.keepAlive();
+  now = 10999;
+  assert.equal(input.releaseExpired(), false);
+  now = 11000;
+  blocked = true;
+  assert.throws(() => input.releaseExpired(), /Windows/);
+  assert.equal(input.keys.size, 1);
+  assert.equal(input.buttons.size, 1);
+  blocked = false;
+  assert.equal(input.releaseExpired(), true);
+  assert.equal(input.keys.size + input.buttons.size, 0);
+  assert.equal(packets.length, 4);
+  now = 100000;
+  assert.equal(input.releaseExpired(), false);
+  assert.equal(packets.length, 4);
+});
 test('Fit, cropped fill, original scrolling and drag outside map to the correct pixels', () => {
   const rect = { left: 100, top: 100, width: 1000, height: 1000 };
   assert.equal(coordinates(rect, 1920, 1080, 'fit', 110, 110), null);

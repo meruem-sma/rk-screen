@@ -2,8 +2,11 @@ const { contextBridge } = require('electron');
 let session = null;
 const state = { inputs: [], writes: [], readCount: 0, reports: [] };
 contextBridge.exposeInMainWorld('rkScreen', {
-  info: async () => ({ name: 'Çalışma bilgisayarı', version: '1.0.0-beta.1' }),
-  saveDiagnostics: async (events) => {state.reports.push(events);return true;},
+  info: async () => ({ name: 'Çalışma bilgisayarı', version: '1.0.0-beta.2' }),
+  saveDiagnostics: async (events) => {
+    state.reports.push(events);
+    return true;
+  },
   sources: async () => [
     {
       id: 'screen:1',
@@ -41,6 +44,7 @@ contextBridge.exposeInMainWorld('rkScreen', {
     )
       state.inputs.push(p);
   },
+  inputKeepAlive: async (t) => session?.role === 'host' && session.input && t === session.token,
   cursor: async () => ({ x: 0.5, y: 0.5, visible: true }),
   pointer: async () => true,
   pointerEnabled: async () => {},

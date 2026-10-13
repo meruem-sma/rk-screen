@@ -82,6 +82,14 @@ app.whenReady().then(async () => {
       true,
     );
     await run("document.getElementById('nav-home').click();");
+    await run(
+      "window.sessionPeer=testPeer;window.sessionId=document.getElementById('device-id').textContent;testPeer.disconnected=true;testPeer.emit('error',{type:'unavailable-id'});testPeer.emit('disconnected');",
+    );
+    assert.equal(await run('incoming.closed===true'), false);
+    assert.equal(await run("document.getElementById('host-session').hidden"), false);
+    assert.equal(await run("document.getElementById('device-id').textContent===sessionId"), true);
+    await wait("document.getElementById('network-label').textContent==='Bağlantıya hazır'");
+    assert.equal(await run('testPeer===sessionPeer'), true);
     assert.equal(await run('testPeer.calls.length'), 0);
     await run(
       "incoming.emit('data',{type:'ready',videoKey:incoming.sent.find(m=>m.type==='granted').videoKey});",
@@ -140,8 +148,20 @@ app.whenReady().then(async () => {
       path.join(root, 'review', 'host-session.png'),
       (await win.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG(),
     );
+    // A destroyed signaling service cannot be recreated until the approved session ends.
+    await run("testPeer.destroyed=true;testPeer.disconnected=true;testPeer.emit('disconnected');");
+    await delay(1200);
+    assert.equal(await run('testPeer===sessionPeer'), true);
+    assert.equal(await run('incoming.closed===true'), false);
     await run("document.getElementById('host-stop').click()");
     await wait("document.getElementById('host-session').hidden");
+    await wait("document.getElementById('network-label').textContent==='Bağlantıya hazır'");
+    assert.equal(await run('testPeer!==sessionPeer'), true);
+    await run(
+      "window.collisionId=document.getElementById('device-id').textContent;testPeer.disconnected=true;testPeer.emit('error',{type:'unavailable-id'});",
+    );
+    await wait("document.getElementById('network-label').textContent==='Bağlantıya hazır'");
+    assert.equal(await run("document.getElementById('device-id').textContent!==collisionId"), true);
     await run(
       "document.getElementById('remote-id').value='123 456 789';document.getElementById('connect-form').dispatchEvent(new Event('submit',{cancelable:true}));",
     );
@@ -151,8 +171,10 @@ app.whenReady().then(async () => {
     );
     await wait("!document.getElementById('remote-session').hidden");
     await run("document.getElementById('report-session').click();");
-    await wait("rkScreen.testState().reports.length===1");
-    assert.ok((await run("rkScreen.testState().reports[0]")).every(e=>!('ip' in e)&&!('name' in e)));
+    await wait('rkScreen.testState().reports.length===1');
+    assert.ok(
+      (await run('rkScreen.testState().reports[0]')).every((e) => !('ip' in e) && !('name' in e)),
+    );
     assert.equal(await run("testConnection.sent.some(m=>m.type==='ready')"), true);
     await run(
       "window.wrongCall=new Call(testConnection.peer);wrongCall.metadata={version:8,videoKey:'22222222-2222-4222-8222-222222222222'};testPeer.emit('call',wrongCall);",
@@ -204,7 +226,7 @@ app.whenReady().then(async () => {
     }
     assert.deepEqual(errors, []);
     console.log(
-      'UI PASS: dashboard, settings, approval, pre-approval denial, input revocation, second connection isolation, video capability and peer checks, escaped chat, controller cleanup, compact layout.',
+      'UI PASS: dashboard, settings, approval, pre-approval denial, input revocation, second connection isolation, video capability and peer checks, signaling collision preserves active session, registration after session ends, idle ID collision recovery, escaped chat, controller cleanup, compact layout.',
     );
     win.destroy();
     app.exit(0);

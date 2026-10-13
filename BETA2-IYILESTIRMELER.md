@@ -10,6 +10,9 @@
 - Paylaşan kişinin son yerel imleç konumu, uzaktan enjekte edilen hareketlerden ayrı tutulur. İzleyen kendi fare imlecini ve karşı bilgisayar adıyla gösterilen ayrı işaretçiyi görür. Paylaşan tarafta isimli uzak işaretçi hareket durduğunda kalp atışıyla görünür kalır. Gerçek Windows masaüstünde tek sistem imleci vardır; ikinci işaretçi görsel katmandır. Yerel kullanıcının hareketine öncelik korunur.
 - Kısa medya kesintisi, yeni çözülen kare doğrulanınca mevcut görüntü oturumunda devam edebilir. Uzun kesintilerde sınırlı yeniden kurma, yeni video anahtarı ve ilk kare ulaşana kadar girdi engeli korunur. İlk medya bağlantısı başarısızlığı da toparlama kapsamındadır.
 - PeerJS bağlantı hizmeti kaybında sınırlı artan aralıklarla yeniden bağlanılır. Mevcut onaylı veri oturumu sırf hizmet bağlantısı kesildi diye yok edilmez.
+- Hizmetin geçici kimlik çakışması da açık ve onaylı ekran oturumunu kapatmaz veya cihaz kimliğini değiştirmez. Oturum bittikten sonra yok edilmiş hizmet bağlantısı yeniden kurulur; gerçek boşta kimlik çakışmasında yeni kimlik alınır.
+- AltGr/Türkçe Unicode yazımında yalnızca bu uzak oturumun bastığı Ctrl/Alt/Shift/Windows tuşları geçici bırakılıp geri yüklenir. Yazım veya bırakma başarısızlığında daha önce bırakılmış tuşların durumu toparlanır. Yerel kullanıcının sahipliği takip edilmeyen tuşlarına müdahale edilmez.
+- Ana süreç, son karşı taraf etkinliğinden 6 saniye sonra oturumun basılı tuttuğu tuşları/fare düğmelerini bırakır; 500 ms aralıkla kontrol eder. Düzenli bağlantı kalp atışı uzun sürükleme ve tuş tutmayı korur. Windows bırakmayı engellerse sahiplik korunur ve tekrar denenir. Önceki oturumun bırakılamamış girdileri temizlenmeden yeni sahip başlatılmaz.
 - Hard-link desteklemeyen Windows/dosya sistemlerinde dosya kaydetme, mevcut dosyayı ezmeyen özel kopyalama yöntemine döner.
 - Rapor kaydet düğmesi son 120 kalite/bağlantı ölçümünü yerel JSON'a kaydeder. IP, cihaz kimliği/adı, sohbet, ekran, dosya içeriği ve TURN parolaları filtrelenir; hiçbir rapor otomatik gönderilmez.
 
@@ -17,7 +20,7 @@
 
 Beta 2, protokol 8 kullanır. Her iki bilgisayar da Beta 2'ye güncellenmelidir; Beta 1 ile oturum kurulmaz. Aynı cihaz kimliği ve yerel tercihler korunur.
 
-40 birim testi; gerçek yerel WebRTC ile veri kuyruğu doluyken hareket, hareketsiz işaretçi kalp atışı, kısa/uzun kesinti, sohbet/dosya ve Türkçe klavye akışları doğrulandı. Arayüz, ayrı imleç penceresi, açılış ve gerçek Windows ekran yakalama kontrolleri de uygulanır. Yerel başarılı test, kullanıcının iki farklı internetindeki gecikme/FPS sorununu tamamen doğrulamaz.
+43 birim testi; gerçek yerel WebRTC ile veri kuyruğu doluyken hareket, hareketsiz işaretçi kalp atışı, kısa/uzun kesinti, sohbet/dosya ve Türkçe klavye akışları doğrulandı. Arayüz, ayrı imleç penceresi, açılış ve gerçek Windows ekran yakalama kontrolleri de uygulanır. Ek testler AltGr modifier sırasını, başarısız bırakmaların tekrar denenmesini, girdi süre aşımını, açık oturum sırasında kimlik çakışmasını ve oturum sonunda yeniden kayıt olmayı kapsar. Yerel başarılı test, kullanıcının iki farklı internetindeki gecikme/FPS sorununu tamamen doğrulamaz.
 
 ## Dış ağ sınırı
 
@@ -26,6 +29,7 @@ Eski openrelay.metered.ca adresi bu makinenin DNS yanıtında 192.0.2.1 örnek a
 - [WebRTC istatistikleri](https://www.w3.org/TR/webrtc-stats/)
 - [WebRTC kodlayıcı tercihleri](https://www.w3.org/TR/webrtc/)
 - [OpenRelay güncel kullanım](https://www.metered.ca/tools/openrelay/)
+- [Windows SendInput: mevcut basılı tuşların etkisi ve yetki sınırları](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
 
 Yeni setup imzasız beta olarak hazırlanır. Windows yayıncı güveni ve gerçek iki fiziksel cihazda farklı ağ testi ayrı kabul koşullarıdır. Yeni GitHub dosyası ve güncel sürüm kaydı doğrulanmadan eski yayın silinmez.
 

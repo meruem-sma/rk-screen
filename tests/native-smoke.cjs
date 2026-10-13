@@ -78,12 +78,15 @@ app.on('browser-window-created', (_event, win) => {
         try{await rkScreen.input('invalid',{type:'key',code:'KeyA',pressed:true});}catch{denied=true;}
         const token=await rkScreen.begin({role:'host',displayId:sources[0].displayId,input:false,clipboard:false,remoteName:'Enes'});
         const inputBlocked=await rkScreen.input(token,{type:'key',code:'KeyA',pressed:true})===false;
+        const viewOnlyKeepAliveBlocked=await rkScreen.inputKeepAlive(token)===false;
         const key1='11111111-1111-4111-8111-111111111111',key2='22222222-2222-4222-8222-222222222222';
         await rkScreen.permissions(token,{input:true,clipboard:false});
         await rkScreen.videoState(token,{videoKey:key1,displayId:sources[0].displayId});
         const transitionInputBlocked=await rkScreen.input(token,{type:'key',code:'KeyA',pressed:true,videoKey:key1})===false;
+        const pausedKeepAliveBlocked=await rkScreen.inputKeepAlive(token)===false;
         const wrongReadyBlocked=await rkScreen.videoReady(token,key2)===false;
         const currentReadyAccepted=await rkScreen.videoReady(token,key1)===true;
+        const readyKeepAliveAccepted=await rkScreen.inputKeepAlive(token)===true;
         const staleInputBlocked=await rkScreen.input(token,{type:'key',code:'KeyA',pressed:true,videoKey:key2})===false;
         await rkScreen.videoState(token,{videoKey:key2,displayId:sources.at(-1).displayId});
         const staleReadyBlocked=await rkScreen.videoReady(token,key1)===false;
@@ -109,14 +112,19 @@ app.on('browser-window-created', (_event, win) => {
         const settings=video.getVideoTracks()[0].getSettings();video.getTracks().forEach(t=>t.stop());
         await rkScreen.end(token);
         const controller=await rkScreen.begin({role:'controller',clipboard:false});
+        const controllerKeepAliveBlocked=await rkScreen.inputKeepAlive(controller)===false;
         let controllerSwitchBlocked=false;
         try{await rkScreen.videoState(controller,{videoKey:key1,displayId:sources[0].displayId});}catch{controllerSwitchBlocked=true;}
         await rkScreen.end(controller);
-        return {version:info.version,compatibility:info.compatibility,sources:sources.length,denied,inputBlocked,transitionInputBlocked,wrongReadyBlocked,currentReadyAccepted,staleInputBlocked,staleReadyBlocked,missingScreenBlocked,controllerSwitchBlocked,pausedPointerBlocked,oldPointerBlocked,disabledPointerBlocked,viewOnlyPointerAccepted,clipboardBlocked,clipboardAsyncRead,clipboardAsyncWrite,width:settings.width,height:settings.height};
+        return {version:info.version,compatibility:info.compatibility,sources:sources.length,denied,inputBlocked,viewOnlyKeepAliveBlocked,pausedKeepAliveBlocked,readyKeepAliveAccepted,controllerKeepAliveBlocked,transitionInputBlocked,wrongReadyBlocked,currentReadyAccepted,staleInputBlocked,staleReadyBlocked,missingScreenBlocked,controllerSwitchBlocked,pausedPointerBlocked,oldPointerBlocked,disabledPointerBlocked,viewOnlyPointerAccepted,clipboardBlocked,clipboardAsyncRead,clipboardAsyncWrite,width:settings.width,height:settings.height};
       })()`);
       assert.equal(result.denied, true);
       assert.equal(result.inputBlocked, true);
       for (const key of [
+        'viewOnlyKeepAliveBlocked',
+        'pausedKeepAliveBlocked',
+        'readyKeepAliveAccepted',
+        'controllerKeepAliveBlocked',
         'transitionInputBlocked',
         'wrongReadyBlocked',
         'currentReadyAccepted',

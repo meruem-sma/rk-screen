@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('rkScreen', {
   videoReady: invoke('video-ready'),
   permissions: invoke('permissions'),
   input: invoke('input'),
+  inputKeepAlive: invoke('input-keepalive'),
   cursor: invoke('cursor'),
   pointer: invoke('pointer'),
   pointerEnabled: invoke('pointer-enabled'),

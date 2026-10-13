@@ -8,6 +8,7 @@ const methods = [
   'videoState',
   'videoReady',
   'input',
+  'inputKeepAlive',
   'cursor',
   'pointer',
   'pointerEnabled',

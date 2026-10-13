@@ -261,6 +261,8 @@ handle('session-begin', async (options) => {
     display = screen.getAllDisplays().find((d) => String(d.id) === options.displayId);
     if (!display) throw new Error('Seçili ekran bulunamadı.');
   }
+  // A failed release from the previous session must not carry into a new owner.
+  injector?.releaseAll();
   const token = crypto.randomUUID();
   session = {
     token,
@@ -340,6 +342,12 @@ handle('permissions', (token, permissions) => {
   s.clipboard = permissions.clipboard === true;
   if (!s.input) injector?.releaseAll();
 });
+handle('input-keepalive', (token) => {
+  const s = authorized(token);
+  if (s.role !== 'host' || !s.input || s.inputPaused) return false;
+  injector?.keepAlive();
+  return true;
+});
 handle('input', (token, data) => {
   const s = authorized(token);
   if (
@@ -355,6 +363,7 @@ handle('input', (token, data) => {
     const { InputInjector } = require('./input/injector');
     injector = new InputInjector();
   }
+  injector.keepAlive();
   if (data.type === 'release-input') {
     injector.releaseAll();
     return true;
@@ -495,6 +504,18 @@ handle('file-cancel', (token) =>
 );
 app.whenReady().then(() => {
   if (!primaryInstance) return;
+  // Independent of renderer/media health: never leave remotely held inputs stuck.
+  let releaseFailed = false;
+  const inputWatchdog = setInterval(() => {
+    try {
+      injector?.releaseExpired();
+      releaseFailed = false;
+    } catch (err) {
+      if (!releaseFailed) logEvent('input-expiry-release-failed: ' + err.message);
+      releaseFailed = true;
+    }
+  }, 500);
+  inputWatchdog.unref();
   logEvent(
     'start ' +
       app.getVersion() +

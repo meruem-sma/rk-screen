@@ -290,15 +290,24 @@
       network('online', 'Bağlantıya hazır');
     });
     peer.on('disconnected', () => {
+      if (peer !== ownerPeer) return;
       network('offline', 'Bağlantı hizmetine erişilemiyor');
       reconnectSignaling(ownerPeer);
     });
     peer.on('error', (err) => {
+      if (peer !== ownerPeer) return;
       if (err.type === 'unavailable-id') {
+        if (gate.approved) {
+          // A stale signaling lease must not tear down an approved P2P session.
+          network('offline', 'Bağlantı hizmeti yeniden deneniyor');
+          reconnectSignaling(ownerPeer);
+          return;
+        }
         if (gate.connection) cleanup();
         deviceId = newDeviceId();
         write('menzil_device_id_v3', deviceId);
         $('device-id').textContent = formatted(deviceId);
+        clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(initPeer, 1000);
         return;
       }
@@ -928,6 +937,7 @@
         break;
       case 'ping':
         send({ type: 'pong', time: m.time });
+        if (gate.role === 'host') await api.inputKeepAlive?.(token);
         break;
       case 'pong':
         lastPong = Date.now();
@@ -1330,6 +1340,8 @@
     refreshControls();
     message('Bağlantı, karşı tarafın onayıyla başlar.');
     if (reason) toast(reason);
+    // A destroyed signaling peer could not be replaced while the session was active.
+    if (!online && peer) reconnectSignaling(peer);
     return ending;
   }
 

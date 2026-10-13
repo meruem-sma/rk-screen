@@ -69,6 +69,12 @@ app
           if (s.session?.input && !s.session.inputPaused && args[1].videoKey === s.session.videoKey)
             s.inputs.push(args[1]);
           return;
+        case 'inputKeepAlive':
+          if (s.session?.role === 'host' && s.session.input && !s.session.inputPaused) {
+            s.inputKeepAlives = (s.inputKeepAlives || 0) + 1;
+            return true;
+          }
+          return false;
         case 'cursor':
           return s.cursor;
         case 'pointer':
@@ -270,6 +276,7 @@ app
         'Enes',
       );
       await delay(2400);
+      assert.ok(hostState.inputKeepAlives > 0, 'controller heartbeat renews held native inputs');
       assert.ok(
         hostState.pointers.length >= pointerCount + 2,
         'stationary pointer stays alive despite reliable-channel backlog',
@@ -298,12 +305,22 @@ app
         'short interruption resumes after a fresh frame without rebuilding',
       );
       assert.equal(hostState.session.inputPaused, false);
-      for (let shortDrop=0; shortDrop<3; shortDrop++) {
-        await run(controller,"Object.defineProperty(shortCall.peerConnection,'connectionState',{configurable:true,value:'disconnected'});shortCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));");
+      for (let shortDrop = 0; shortDrop < 3; shortDrop++) {
+        await run(
+          controller,
+          "Object.defineProperty(shortCall.peerConnection,'connectionState',{configurable:true,value:'disconnected'});shortCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));",
+        );
         await delay(150);
-        await run(controller,"Object.defineProperty(shortCall.peerConnection,'connectionState',{configurable:true,value:'connected'});shortCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));");
-        await wait(controller,"document.getElementById('video-wait').hidden");
-        assert.equal(hostState.session.videoKey,keyBeforeRecovery,'short interruptions must not exhaust the full-rebuild budget');
+        await run(
+          controller,
+          "Object.defineProperty(shortCall.peerConnection,'connectionState',{configurable:true,value:'connected'});shortCall.peerConnection.dispatchEvent(new Event('connectionstatechange'));",
+        );
+        await wait(controller, "document.getElementById('video-wait').hidden");
+        assert.equal(
+          hostState.session.videoKey,
+          keyBeforeRecovery,
+          'short interruptions must not exhaust the full-rebuild budget',
+        );
       }
       console.log(
         'E2E live channel: blocked reliable queue, stationary pointer heartbeat, transient recovery without rebuild',
