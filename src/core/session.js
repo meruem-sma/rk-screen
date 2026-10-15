@@ -170,23 +170,36 @@
     constructor() {
       this.buckets = new Map();
     }
-    allow(type, now = performance.now()) {
-      if (type === 'release-input' || type === 'bye') return true;
-      const group = inputTypes.has(type) || ['pointer', 'cursor'].includes(type) ? 'input' : type;
+    allow(message, now = performance.now()) {
+      const type = typeof message === 'string' ? message : message.type;
+      // Never strand an owned key/button because motion used up its budget.
+      if (
+        type === 'release-input' ||
+        type === 'bye' ||
+        (['key', 'mouse-button'].includes(type) && message.pressed === false)
+      )
+        return true;
+      const group = ['mouse-move', 'pointer', 'cursor'].includes(type)
+        ? 'motion'
+        : inputTypes.has(type)
+          ? 'control'
+          : type;
       const [rate, capacity] =
-        group === 'input'
-          ? [240, 300]
-          : group === 'chat'
-            ? [8, 16]
-            : group === 'clipboard'
-              ? [4, 8]
-              : [60, 90];
+        group === 'motion'
+          ? [180, 240]
+          : group === 'control'
+            ? [120, 180]
+            : group === 'chat'
+              ? [8, 16]
+              : group === 'clipboard'
+                ? [4, 8]
+                : [60, 90];
       const previous = this.buckets.get(group) || { tokens: capacity, time: now };
       const tokens = Math.min(
         capacity,
         previous.tokens + (Math.max(0, now - previous.time) * rate) / 1000,
       );
-      this.buckets.set(group, { tokens: Math.max(0, tokens - 1), time: now });
+      this.buckets.set(group, { tokens: tokens >= 1 ? tokens - 1 : tokens, time: now });
       return tokens >= 1;
     }
   }

@@ -1,6 +1,6 @@
 # RK Screen — Beta 1
 
-Windows x64 için Türkçe ekran paylaşımı ve uzaktan destek. Güncel yapı **20261015.2**;
+Windows x64 için Türkçe ekran paylaşımı ve uzaktan destek. Güncel yapı **20261015.3**;
 tek yayın sürümü **1.0.0-beta.1**. MIT lisansıyla açık kaynak. Koyu arayüz ve RK monogramı.
 
 [Güncel durum ve açık işler](GUNCEL-DURUM.md) ·
@@ -9,7 +9,7 @@ tek yayın sürümü **1.0.0-beta.1**. MIT lisansıyla açık kaynak. Koyu aray�
 
 ## Kullanım
 
-1. İki bilgisayara da güncel Beta 1 setup'ını kurun. Eski Beta 1 yapılarıyla bağlantı kurulmayabilir; yapı numarası iki tarafta **20261015.2** olmalıdır.
+1. İki bilgisayara da güncel Beta 1 setup'ını kurun. Eski Beta 1 yapılarıyla bağlantı kurulmayabilir; yapı numarası iki tarafta **20261015.3** olmalıdır.
 2. Karşı bilgisayarın dokuz haneli kimliğini girin. Ekranını paylaşan kişi monitörü ve izinleri seçip isteği kabul eder. Kontrol, pano ve ses ayrı izinlerdir.
 3. Her iki taraftaki bağlantı doğrulama kodunu başka bir güvenilir iletişim yoluyla karşılaştırın. Kodlar farklıysa bağlantıyı bitirin. Görünen bilgisayar adı tek başına kimlik kanıtı değildir.
 4. Fare/klavye izni verildiyse araç çubuğunda **Fare ve klavye** seçip uzak ekrana tıklayın. **Yalnızca izle** modunda girdi gönderilmez.

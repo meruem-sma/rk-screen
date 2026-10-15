@@ -1,8 +1,34 @@
 # RK Screen — Beta 1
 
-15 Ekim 2026. Tek yayın sürümü `1.0.0-beta.1`; yeni MVP yapısı `20261015.2`.
+15 Ekim 2026. Tek yayın sürümü `1.0.0-beta.1`; yeni MVP yapısı `20261015.3`.
 Beta 2 adıyla hazırlanan geliştirmeler bu Beta 1 güncellemesine alındı. Eski sürüm
 notları kaldırıldı; güncel yayın durumu ve açık işler bu belgede tutulur.
+
+## 1.0 yayın değerlendirmesi — 15 Ekim 2026
+
+**Karar: henüz kararlı 1.0 yayımlamaya hazır değil.** Yeni özelliklerin çoğu var;
+ancak gerçek ağ/kurulum kabulünün eksik olması, bütün sistemin düzgün çalıştığı
+sonucuna izin vermez. Beta etiketi bu kontroller bitmeden kaldırılmaz.
+
+| Konu | Durum ve 1.0 için gereken |
+| --- | --- |
+| Kaynak ve testler | Yeni incelemede iki hata yeniden üretildi ve düzeltildi: hareket trafiğinin klavyeyi/tuş bırakmayı engellemesi ve iptal edilmiş dosya onayının geç hatasının yeni aktarımı kapatması. Regresyon testleri eklendi. |
+| Sürüm bilgisi | Hakkında ekranındaki eski yapı ve sabit Beta 1 etiketleri düzeltildi. Arayüz gerçek paket sürümünden beta/kararlı adını üretir; bu hazırlık tek başına 1.0 yayını değildir. |
+| Farklı internetler | Çalışan varsayılan TURN yok. Genel internetten erişim hedefi için gerçek aktarma yolu doğrulanmalı veya ürün kapsamı doğrudan bağlantı kurabilen ağlarla açıkça sınırlanmalı. |
+| Gerçek kalite | Son yapıyla iki fiziksel cihazda farklı internetlerde ölçüm eksik. Kullanıcının eski yapıdaki düşük kalite şikâyetinin giderildiği henüz kanıtlanmadı. |
+| Kurulum/yaşam döngüsü | Ayrı temiz Windows 10/11, önceki kurulum üzerine yükseltme ve kaldırma doğrulanmadı. Yayın kaydındaki installVerified değeri false. Uyku/uyanma ve ağ değişimi de sınanmalı. |
+| Güvenlik | Mevcut izin/sandbox/mesaj sınırları test ediliyor. Doğrulama kodu veri bağlantısının sertifikalarına dayanır; ayrı medya bağlantısının sertifikaları bu koda dahil değildir. Kalıcı cihaz kimliği veya bağımsız güvenlik denetimi tamamlandı denemez. |
+| Windows dağıtımı | Setup imzasız. Mevcut normal derleme hattı imza ister; açık imzasız dağıtım istisnası beta ile sınırlıdır. Bu bir proje yayın politikasıdır; Windows'un her imzasız 1.0 paketini teknik olarak yasakladığı anlamına gelmez. Ücretli hizmete/hesaba başvurulmadı. |
+| Canlı site | 15 Ekim tarayıcı kontrolünde HTTPS sayfası gizlilik uyarısı olmadan açıldı, CSS ve logo yüklendi. İndirme düğmesi GitHub'daki geçerli setup'a yönlendi. Canlı tanıtım metinleri eski; güncel ZIP hosting'e ayrıca yüklenmeli. Komut satırı isteğinin başarısız olması sitenin tarayıcıda kapalı olduğu anlamına gelmedi. |
+
+**1.0 için şart olmayan ek özellikler:** serbest çizim, kesilen dosyaya devam,
+gözetimsiz erişim ve otomatik kurulum sonraya bırakılabilir. Öncelik mevcut temel
+bağlantı, ekran, girdi, dosya ve kurulum akışının doğrulanmasıdır.
+
+**Şimdi yapılmaması gerekenler:** sadece sürüm numarasını değiştirip kararlı ilan
+etmek; test geçişini tüm internetlerde çalışma garantisi saymak; yeni paket
+kontrol edilmeden eskisini silmek; canlı site kabulü olmadan yayını tamamlandı
+saymak. Kullanıcı ayarları ve alınmış dosyalar sürüm temizliğiyle silinmez.
 
 ## Tamamlanan işler
 
@@ -60,7 +86,7 @@ yerine geçmez. Testler kullanıcının gerçek masaüstüne tuş/fare basmaz.
 
 ## İlk fiziksel test
 
-İki cihazda **Beta 1 · 20261015.2** kurun. Aynı doğrulama kodunu gördüğünüzü kontrol edin.
+İki cihazda **Beta 1 · 20261015.3** kurun. Aynı doğrulama kodunu gördüğünüzü kontrol edin.
 Önce Otomatik, sonra Net metin profilini aynı hareketli içerikle karşılaştırın. Her iki taraftan
 Rapor kaydet ile ölçüm alın; doğrudan/aktarma rotası, çözünürlük, gerçek FPS, gecikme/kayıp
 ve donma anını birlikte inceleyin. Yalnızca düşük FPS, hareketsiz masaüstünde tek başına hata değildir.
@@ -99,7 +125,8 @@ Kullanıcı dosyaları, kurulu ayarlar ve alınmış dosyalar temizliğe dahil d
   kabul edilir; süre/boyut sınırı vardır. Kullanıcı isteğiyle indirme açılır;
   otomatik kurulum veya imzalıymış gibi gösterme yoktur.
 - [x] Oturum mesaj hız sınırları; aşırı fare/sohbet trafiği sınırlanır. Girdi bırakma
-  komutu sınır dolduğunda da çalışır. Dosya parça onayları sayısal olarak doğrulanır.
+  komutu ve tuş/fare bırakma olayları sınır dolduğunda da çalışır. Fare hareketi ve
+  klavye ayrı bütçe kullanır. Dosya parça onayları sayısal olarak doğrulanır.
 
 ### Yayın kabulü
 
@@ -125,9 +152,10 @@ Kullanıcı dosyaları, kurulu ayarlar ve alınmış dosyalar temizliğe dahil d
 - [ ] Kopan dosyayı güvenli biçimde devam ettirme, serbest çizim, kalıcı cihaz
   eşleştirme/anahtar iptali ve bağımsız güvenlik incelemesi sonraki aşamadadır.
 - [ ] Uyku/uyanma, Wi-Fi değişimi, Türkçe Q/F ve karma DPI/çoklu monitörde fiziksel test.
-- [ ] Canlı site: 15 Ekim erişim denemesinde HTTPS bağlantısı kapanıyor ve HTTP boş
-  yanıt döndürüyor. Geçerli sertifika, CSS ve yönlendirme bu denemede doğrulanamadı.
-  Hosting hesabına erişim olmadan sunucu ayarı değiştirilemez; yerel ZIP ayrı test edilir.
+- [x] Canlı site: 15 Ekim tarayıcı kontrolünde HTTPS, CSS, logo ve GitHub indirme
+  bağlantısı doğrulandı. Bu kontrol farklı tarayıcı/cihazların tümünü kapsamaz.
+- [ ] Yeni tanıtım metinlerini içeren güncel site ZIP'ini hosting'e yükleme.
+  İndirme düğmesi GitHub'daki güncel paket kaydını okur; hosting metinleri ayrı güncellenir.
 
 Kaynaklar: [WebRTC TURN](https://webrtc.org/getting-started/turn-server),
 [OpenRelay](https://www.metered.ca/tools/openrelay/), [freeSTUN](https://freestun.net/),

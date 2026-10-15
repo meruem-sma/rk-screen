@@ -168,6 +168,25 @@ app.whenReady().then(async () => {
       path.join(root, 'review', 'host-session.png'),
       (await win.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG(),
     );
+    // A late failure from a cancelled approval must not cancel a newer offer.
+    await run(
+      "rkScreen.testHoldFileBegin();incoming.emit('data',{type:'file-offer',id:'old-file',name:'old.txt',size:1});",
+    );
+    await wait("!document.getElementById('file-approval').hidden");
+    await run("document.getElementById('accept-file').click();");
+    await wait('rkScreen.testState().fileBeginHeld===true');
+    await run("document.getElementById('cancel-file').click();");
+    await wait("document.getElementById('transfer-panel').hidden");
+    await run("incoming.emit('data',{type:'file-offer',id:'new-file',name:'new.txt',size:1});");
+    await wait(
+      "document.getElementById('transfer-name').textContent==='new.txt' && !document.getElementById('file-approval').hidden",
+    );
+    const cancelsBeforeLateFailure = await run('rkScreen.testState().fileCancels');
+    await run('rkScreen.testFailHeldFileBegin();');
+    await delay(100);
+    assert.equal(await run("document.getElementById('transfer-panel').hidden"), false);
+    assert.equal(await run('rkScreen.testState().fileCancels'), cancelsBeforeLateFailure);
+    await run("document.getElementById('cancel-file').click();");
     // A destroyed signaling service cannot be recreated until the approved session ends.
     await run("testPeer.destroyed=true;testPeer.disconnected=true;testPeer.emit('disconnected');");
     await delay(1200);
@@ -259,6 +278,14 @@ app.whenReady().then(async () => {
     );
     await run("document.getElementById('clear-recents').click();");
     assert.equal(await run("JSON.parse(localStorage.getItem('menzil_recents')).length"), 1);
+    await run("localStorage.setItem('test-product-version','1.0.0');");
+    await win.loadFile(path.join(root, 'review', 'ui-fixture.html'));
+    await wait("document.getElementById('app-version').textContent==='Sürüm 1.0.0 · 20261015.3'");
+    assert.equal(
+      await run("document.getElementById('about-version').textContent"),
+      'Sürüm 1.0.0 · 20261015.3',
+    );
+    await run("localStorage.removeItem('test-product-version');");
     // Valid JSON can still have the wrong shape or name an inherited object property.
     for (const prefs of [42, 'broken', [], { quality: 'constructor', clipboard: 'true' }]) {
       await run(
@@ -269,7 +296,7 @@ app.whenReady().then(async () => {
     }
     assert.deepEqual(errors, []);
     console.log(
-      'UI PASS: dashboard, settings, approval, pre-approval denial, input revocation, second connection isolation, video capability and peer checks, signaling collision preserves active session, registration after session ends, idle ID collision recovery, escaped chat, controller cleanup, compact layout.',
+      'UI PASS: dashboard, settings, approval, input revocation, session isolation, stale file approval failure isolation, chat, favorites, update control, stable version labels and compact layout.',
     );
     win.destroy();
     app.exit(0);

@@ -904,7 +904,7 @@
       refreshControls();
       return;
     }
-    if (!validMessage(m) || !token || !traffic.allow(m.type)) return;
+    if (!validMessage(m) || !token || !traffic.allow(m)) return;
     if (inputTypes.has(m.type)) {
       if (gate.role === 'host') {
         try {
@@ -2008,10 +2008,12 @@
   async function acceptFile() {
     const task = transfer;
     if (!task || task.direction !== 'in' || task.accepted || task.processing) return;
+    const owner = gate.connection,
+      ownerToken = token;
     task.processing = true;
     try {
-      await api.beginFile(token, task);
-      if (transfer !== task) return;
+      await api.beginFile(ownerToken, task);
+      if (transfer !== task || gate.connection !== owner || token !== ownerToken) return;
       task.accepted = true;
       task.startedAt = performance.now();
       $('file-approval').hidden = true;
@@ -2020,6 +2022,7 @@
       fileTimer = setTimeout(() => cancelTransfer(true), 30000);
       transferUI('Dosya alınıyor', task.name, 'Aktarım başlıyor…');
     } catch (err) {
+      if (transfer !== task || gate.connection !== owner || token !== ownerToken) return;
       await cancelTransfer();
       toast(errorText(err), true);
     }
@@ -2030,8 +2033,11 @@
       name = window.RKScreenPointer.cleanName(info.name);
       $('compatibility-mode').checked = info.compatibility === true;
       $('machine-name').textContent = name;
+      const beta = /-beta\.(\d+)$/.exec(info.version);
       $('app-version').textContent =
-        'Beta 1' + (info.build ? ' · ' + info.build : ' · ' + info.version);
+        (beta ? 'Beta ' + beta[1] : 'Sürüm ' + info.version) +
+        (info.build ? ' · ' + info.build : '');
+      $('about-version').textContent = $('app-version').textContent;
     }
     deviceId = read('menzil_device_id_v3', '');
     if (!/^\d{9}$/.test(deviceId)) {

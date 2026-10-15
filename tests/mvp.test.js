@@ -117,12 +117,25 @@ test('Multi-file selection is bounded, hides paths, streams in order and cancels
 
 test('Traffic limits bound floods without preventing release or unrelated chat', () => {
   const guard = new SessionTraffic();
-  for (let i = 0; i < 300; i++) assert.equal(guard.allow('mouse-move', 0), true);
-  assert.equal(guard.allow('text', 0), false);
+  for (let i = 0; i < 240; i++) assert.equal(guard.allow('mouse-move', 0), true);
+  assert.equal(guard.allow('mouse-move', 0), false);
+  assert.equal(guard.allow('text', 0), true);
   assert.equal(guard.allow('release-input', 0), true);
   assert.equal(guard.allow('chat', 0), true);
   assert.equal(guard.allow('mouse-move', 1000), true);
   assert.equal(validMessage({ type: 'file-reply', id: 'x', status: 'chunk', index: -1 }), false);
+});
+
+test('Continuous motion cannot starve keyboard releases or discard fractional rate credits', () => {
+  const guard = new SessionTraffic();
+  for (let i = 0; i < 1000 && guard.allow('mouse-move', 0); i++) {}
+  assert.equal(guard.allow('key', 0), true, 'keyboard must have a separate budget');
+  for (let i = 0; i < 1000 && guard.allow('key', 0); i++) {}
+  assert.equal(guard.allow({ type: 'key', pressed: false }, 0), true);
+  assert.equal(guard.allow({ type: 'mouse-button', pressed: false }, 0), true);
+  let admitted = 0;
+  for (let time = 1; time <= 1000; time++) if (guard.allow('mouse-move', time)) admitted++;
+  assert.ok(admitted >= 170 && admitted <= 181, `continuous motion admitted ${admitted}`);
 });
 
 test('Loss with delay lowers the frame budget without ratcheting bitrate; freeze telemetry handles reset', () => {

@@ -1,8 +1,13 @@
 const { contextBridge } = require('electron');
 let session = null;
+let heldFileBegin = null;
 const state = { inputs: [], writes: [], readCount: 0, reports: [], exports: [], copied: [] };
 contextBridge.exposeInMainWorld('rkScreen', {
-  info: async () => ({ name: 'Çalışma bilgisayarı', version: '1.0.0-beta.1', build: '20261015.2' }),
+  info: async () => ({
+    name: 'Çalışma bilgisayarı',
+    version: localStorage.getItem('test-product-version') || '1.0.0-beta.1',
+    build: '20261015.3',
+  }),
   checkUpdate: async () => ({ available: true, build: '20261016.1', signed: false }),
   openUpdate: async () => {},
   copyText: async (text) => state.copied.push(text),
@@ -71,9 +76,26 @@ contextBridge.exposeInMainWorld('rkScreen', {
   fullscreen: async () => true,
   selectFile: async () => null,
   readFile: async () => null,
-  beginFile: async () => {},
+  beginFile: async () => {
+    if (state.holdFileBegin)
+      return new Promise((_resolve, reject) => {
+        heldFileBegin = reject;
+        state.fileBeginHeld = true;
+      });
+  },
   writeChunk: async () => 3,
   finishFile: async () => ({ name: 'test.txt' }),
-  cancelFile: async () => {},
+  cancelFile: async () => {
+    state.fileCancels = (state.fileCancels || 0) + 1;
+  },
+  testHoldFileBegin: () => {
+    state.holdFileBegin = true;
+  },
+  testFailHeldFileBegin: () => {
+    state.holdFileBegin = false;
+    state.fileBeginHeld = false;
+    heldFileBegin?.(Error('Test: eski aktarım sonradan başarısız oldu'));
+    heldFileBegin = null;
+  },
   testState: () => JSON.parse(JSON.stringify(state)),
 });

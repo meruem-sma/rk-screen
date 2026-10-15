@@ -6,7 +6,7 @@
   const messages = {
     offline: 'İnternet bağlantısı yok. Wi-Fi veya kablo bağlantısını kontrol edip yeniden deneyin.',
     'peer-unavailable':
-      'Karşı bilgisayar bulunamadı. RK Screen iki cihazda da açık olmalı; kimliği ve Beta 1 yapı numarasını kontrol edin.',
+      'Karşı bilgisayar bulunamadı. RK Screen iki cihazda da açık olmalı; kimliği ve yapı numarasını kontrol edin.',
     network:
       'Bağlantı hizmetine ulaşılamıyor. İnterneti kontrol edin; hizmete erişim otomatik yeniden denenecek.',
     'socket-error':
@@ -19,7 +19,7 @@
     timeout:
       'Bağlantı zamanında kurulamadı. Karşı uygulamanın açık olduğunu kontrol edin. Farklı ağlarda doğrudan erişim engelleniyorsa aktarma sunucusu gerekir.',
     busy: 'Karşı bilgisayarda başka bir oturum açık. Oturum bittikten sonra yeniden deneyin.',
-    version: 'İki cihazın bağlantı biçimi farklı. İkisinde de güncel Beta 1 setup’ını kurun.',
+    version: 'İki cihazın bağlantı biçimi farklı. İkisinde de güncel RK Screen setup’ını kurun.',
     disabled:
       'Karşı bilgisayarda gelen bağlantı istekleri kapalı. Ekran sahibi Ayarlar’dan açabilir.',
     rate: 'Çok sık bağlantı isteği gönderildi. Bir dakika bekleyip yeniden deneyin.',
