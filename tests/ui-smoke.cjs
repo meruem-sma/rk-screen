@@ -31,8 +31,9 @@ app.whenReady().then(async () => {
   });
   const run = (code) =>
     win.webContents.executeJavaScript(code + (code.trim().endsWith(';') ? '\nvoid 0;' : ''));
-  const wait = async (code) => {
-    for (let i = 0; i < 80; i++) {
+  const wait = async (code, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
       if (await run(code)) return;
       await delay(50);
     }
@@ -194,7 +195,8 @@ app.whenReady().then(async () => {
     assert.equal(await run('incoming.closed===true'), false);
     await run("document.getElementById('host-stop').click()");
     await wait("document.getElementById('host-session').hidden");
-    await wait("document.getElementById('network-label').textContent==='Bağlantıya hazır'");
+    // Registration deliberately backs off up to 30 seconds after signaling loss.
+    await wait("document.getElementById('network-label').textContent==='Bağlantıya hazır'", 35000);
     assert.equal(await run('testPeer!==sessionPeer'), true);
     await run(
       "window.collisionId=document.getElementById('device-id').textContent;testPeer.disconnected=true;testPeer.emit('error',{type:'unavailable-id'});",
