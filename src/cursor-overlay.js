@@ -8,7 +8,7 @@ class CursorOverlay {
     this.ready = false;
     this.timer = null;
   }
-  update(bounds, point, name) {
+  update(bounds, point, name, owner = 'remote') {
     if (!this.win || this.win.isDestroyed()) {
       this.ready = false;
       const win = (this.win = new BrowserWindow({
@@ -46,10 +46,17 @@ class CursorOverlay {
           if (this.win === win) this.close();
         });
     }
-    this.pending = { ...overlayGeometry(bounds, point), name: cleanName(name) };
+    const next = {
+      ...overlayGeometry(bounds, point),
+      name: cleanName(name),
+      pulse: point.pulse === true,
+      owner,
+    };
+    const changed = JSON.stringify(next) !== JSON.stringify(this.pending);
+    this.pending = next;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.hide(), 3000);
-    this.render();
+    if (changed || !this.win.isVisible()) this.render();
   }
   render() {
     if (!this.ready || !this.pending || this.win?.isDestroyed()) return;

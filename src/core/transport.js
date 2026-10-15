@@ -4,6 +4,9 @@
   else root.RKScreenTransport = value;
 })(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   const finite = (v) => Number.isFinite(v) && v >= 0;
+  function remoteLoss(row) {
+    return finite(row?.fractionLost) && row.fractionLost <= 1 ? row.fractionLost * 100 : null;
+  }
   function selectedRoute(stats) {
     const rows = [...stats.values()];
     const transport = rows.find((r) => r.type === 'transport' && r.selectedCandidatePairId);
@@ -35,6 +38,9 @@
       lost = delta('packetsLost');
     const elapsed = same ? (row.timestamp - previous.timestamp) / 1000 : null;
     return {
+      freezeMs:
+        delta('totalFreezesDuration') === null ? null : delta('totalFreezesDuration') * 1000,
+      freezes: delta('freezeCount'),
       fps: finite(row.framesPerSecond)
         ? row.framesPerSecond
         : frames !== null
@@ -52,6 +58,8 @@
         framesDecoded: row.framesDecoded,
         packetsReceived: row.packetsReceived,
         packetsLost: row.packetsLost,
+        freezeCount: row.freezeCount,
+        totalFreezesDuration: row.totalFreezesDuration,
       },
     };
   }
@@ -70,16 +78,18 @@
     }
     update(profile, sample) {
       const before = this.limits(profile);
+      const congestion =
+        finite(sample.loss) && sample.loss >= 3 && finite(sample.rtt) && sample.rtt >= 180;
       // availableOutgoingBitrate is the transport's congestion estimate, not
       // an independent link speed. Re-capping to 85% of it creates a feedback
       // ratchet that suppresses probing. Leave bitrate control to WebRTC.
-      if (sample.limitation === 'bandwidth') {
+      if (sample.limitation === 'bandwidth' || congestion) {
         this.networkGood = 0;
         this.network++;
         if (this.network >= 5) this.networkStage = Math.max(this.networkStage, 1);
         if (this.network >= 10) this.networkStage = Math.max(this.networkStage, 2);
         if (this.network >= 20) this.networkStage = Math.max(this.networkStage, 3);
-      } else if (sample.limitation === 'none') {
+      } else if (sample.limitation === 'none' && (!finite(sample.loss) || sample.loss < 1)) {
         this.network = 0;
         if (++this.networkGood >= 5) {
           this.networkStage = Math.max(0, this.networkStage - 1);
@@ -96,7 +106,7 @@
           this.fps = before.fps > 30 ? 30 : Math.min(before.fps, 15);
           this.cpu = 0;
         }
-      } else if (sample.limitation === 'none') {
+      } else if (sample.limitation === 'none' && !congestion) {
         this.cpu = 0;
         if (++this.cpuGood >= 5) {
           this.fps = before.fps < 30 && profile.fps > 30 ? 30 : null;
@@ -211,6 +221,7 @@
     }
   }
   return {
+    remoteLoss,
     selectedRoute,
     receiveSample,
     AdaptiveQuality,

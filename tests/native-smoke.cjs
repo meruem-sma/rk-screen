@@ -87,6 +87,11 @@ app.on('browser-window-created', (_event, win) => {
         const wrongReadyBlocked=await rkScreen.videoReady(token,key2)===false;
         const currentReadyAccepted=await rkScreen.videoReady(token,key1)===true;
         const readyKeepAliveAccepted=await rkScreen.inputKeepAlive(token)===true;
+        await rkScreen.pauseControl(token,true);
+        const manualPauseInputBlocked=await rkScreen.input(token,{type:'text',text:'do not type',videoKey:key1})===false;
+        const manualPauseKeepAliveBlocked=await rkScreen.inputKeepAlive(token)===false;
+        const manualPauseReported=(await rkScreen.cursor(token)).control==='manual';
+        await rkScreen.pauseControl(token,false);
         const staleInputBlocked=await rkScreen.input(token,{type:'key',code:'KeyA',pressed:true,videoKey:key2})===false;
         await rkScreen.videoState(token,{videoKey:key2,displayId:sources.at(-1).displayId});
         const staleReadyBlocked=await rkScreen.videoReady(token,key1)===false;
@@ -116,7 +121,7 @@ app.on('browser-window-created', (_event, win) => {
         let controllerSwitchBlocked=false;
         try{await rkScreen.videoState(controller,{videoKey:key1,displayId:sources[0].displayId});}catch{controllerSwitchBlocked=true;}
         await rkScreen.end(controller);
-        return {version:info.version,compatibility:info.compatibility,sources:sources.length,denied,inputBlocked,viewOnlyKeepAliveBlocked,pausedKeepAliveBlocked,readyKeepAliveAccepted,controllerKeepAliveBlocked,transitionInputBlocked,wrongReadyBlocked,currentReadyAccepted,staleInputBlocked,staleReadyBlocked,missingScreenBlocked,controllerSwitchBlocked,pausedPointerBlocked,oldPointerBlocked,disabledPointerBlocked,viewOnlyPointerAccepted,clipboardBlocked,clipboardAsyncRead,clipboardAsyncWrite,width:settings.width,height:settings.height};
+        return {version:info.version,compatibility:info.compatibility,sources:sources.length,denied,inputBlocked,viewOnlyKeepAliveBlocked,pausedKeepAliveBlocked,readyKeepAliveAccepted,manualPauseInputBlocked,manualPauseKeepAliveBlocked,manualPauseReported,controllerKeepAliveBlocked,transitionInputBlocked,wrongReadyBlocked,currentReadyAccepted,staleInputBlocked,staleReadyBlocked,missingScreenBlocked,controllerSwitchBlocked,pausedPointerBlocked,oldPointerBlocked,disabledPointerBlocked,viewOnlyPointerAccepted,clipboardBlocked,clipboardAsyncRead,clipboardAsyncWrite,width:settings.width,height:settings.height};
       })()`);
       assert.equal(result.denied, true);
       assert.equal(result.inputBlocked, true);
@@ -124,6 +129,9 @@ app.on('browser-window-created', (_event, win) => {
         'viewOnlyKeepAliveBlocked',
         'pausedKeepAliveBlocked',
         'readyKeepAliveAccepted',
+        'manualPauseInputBlocked',
+        'manualPauseKeepAliveBlocked',
+        'manualPauseReported',
         'controllerKeepAliveBlocked',
         'transitionInputBlocked',
         'wrongReadyBlocked',

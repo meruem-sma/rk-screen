@@ -80,9 +80,20 @@
       case 'clipboard':
         return typeof m.text === 'string' && m.text.length <= 100000;
       case 'cursor':
+        return (
+          unit(m.x) &&
+          unit(m.y) &&
+          typeof m.visible === 'boolean' &&
+          validVideoKey(m.videoKey) &&
+          (m.control === undefined || ['none', 'manual', 'local'].includes(m.control))
+        );
       case 'pointer':
         return (
-          unit(m.x) && unit(m.y) && typeof m.visible === 'boolean' && validVideoKey(m.videoKey)
+          unit(m.x) &&
+          unit(m.y) &&
+          typeof m.visible === 'boolean' &&
+          validVideoKey(m.videoKey) &&
+          (m.pulse === undefined || typeof m.pulse === 'boolean')
         );
       case 'video-info':
         return (
@@ -136,7 +147,8 @@
       case 'file-reply':
         return (
           typeof m.id === 'string' &&
-          ['accept', 'reject', 'chunk', 'saved', 'error', 'cancel'].includes(m.status)
+          ['accept', 'reject', 'chunk', 'saved', 'error', 'cancel'].includes(m.status) &&
+          (m.status !== 'chunk' || (Number.isSafeInteger(m.index) && m.index >= 0))
         );
       default:
         return false;
@@ -154,5 +166,29 @@
       return true;
     }
   }
-  return { SessionGate, validMessage, inputTypes, RequestLimiter, validVideoKey };
+  class SessionTraffic {
+    constructor() {
+      this.buckets = new Map();
+    }
+    allow(type, now = performance.now()) {
+      if (type === 'release-input' || type === 'bye') return true;
+      const group = inputTypes.has(type) || ['pointer', 'cursor'].includes(type) ? 'input' : type;
+      const [rate, capacity] =
+        group === 'input'
+          ? [240, 300]
+          : group === 'chat'
+            ? [8, 16]
+            : group === 'clipboard'
+              ? [4, 8]
+              : [60, 90];
+      const previous = this.buckets.get(group) || { tokens: capacity, time: now };
+      const tokens = Math.min(
+        capacity,
+        previous.tokens + (Math.max(0, now - previous.time) * rate) / 1000,
+      );
+      this.buckets.set(group, { tokens: Math.max(0, tokens - 1), time: now });
+      return tokens >= 1;
+    }
+  }
+  return { SessionGate, validMessage, inputTypes, RequestLimiter, validVideoKey, SessionTraffic };
 });

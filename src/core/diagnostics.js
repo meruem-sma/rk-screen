@@ -15,6 +15,8 @@
     'rtt',
     'fps',
     'loss',
+    'freezeMs',
+    'freezes',
     'mbps',
     'targetFps',
     'maxBitrate',

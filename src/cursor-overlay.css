@@ -28,3 +28,16 @@ body {
   border-radius: 4px;
   padding: 3px 7px;
 }
+#arrow.pulse {
+  outline: 3px solid #f4cd8c;
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+.local #arrow {
+  color: #d4e4cb;
+}
+.local #label {
+  color: #e8f3e2;
+  background: #293d25f2;
+  border-color: #adc6a6;
+}

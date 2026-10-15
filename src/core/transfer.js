@@ -52,5 +52,23 @@
       this.pending.clear();
     }
   }
-  return { ChunkWindow };
+  function paceChunk(bytes, bitrate, signal) {
+    if (signal?.aborted) return Promise.reject(Error('Aktarım iptal edildi.'));
+    const delay = Math.ceil(
+      (Math.max(0, Math.min(32768, bytes)) * 8000) /
+        Math.max(64000, Math.min(2000000, bitrate || 1000000)),
+    );
+    return new Promise((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        reject(Error('Aktarım iptal edildi.'));
+      };
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', abort);
+        resolve();
+      }, delay);
+      signal?.addEventListener('abort', abort, { once: true });
+    });
+  }
+  return { ChunkWindow, paceChunk };
 });

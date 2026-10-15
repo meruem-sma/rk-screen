@@ -76,7 +76,7 @@ Bunlar tekil deneyimlerdir; ürün genelinde oran veya doğrulanmış hata neden
 - **29 Ağustos 2026:** Akışta kare atlama ve hareketli görüntüde takılma şikâyeti. RK Screen için çıkarım: tek bir yüksek bit hızı ayarı yeterli değil; metin ve hareket profilleri ayrı ölçülmeli. [Başlık](https://www.reddit.com/r/AnyDesk/comments/1w1t3hh/why_is_it_so_choppy/)
 - **18 Eylül 2026:** Yavaş bağlantı şikâyetinin yanında taşınabilir kullanım ve günlük işlerde yeterli performans olumlu anılıyor. Bilerek yavaşlatıldığı iddiası doğrulanmış değil. Çıkarım: kurulum gerektirmeyen seçenek korunmalı; kaynak/ağ darboğazı görünür olmalı. [Başlık](https://www.reddit.com/r/AnyDesk/comments/1wjiy4h/is_anydesk_messing_up_again_with_free_users_by/)
 - **6 Mayıs 2024:** Uzak imleci kapatamama ve performans şikâyeti. Çıkarım: işaretçi görünürlüğü, kontrol izninden ayrı olmalı. [Başlık](https://www.reddit.com/r/AnyDesk/comments/1cl6iwa/)
-- Önceki TeamViewer arayüz/sohbet bulunabilirliği ve AnyDesk tuş/dosya araştırması [RK-SCREEN-PLAN.md](RK-SCREEN-PLAN.md) içinde korunuyor.
+- Güncel uygulama kapsamı ve sonraki işler [GUNCEL-DURUM.md](GUNCEL-DURUM.md) içinde tutulur; bu belge araştırma kaydıdır.
 
 ## Kodda bulunan ve 0.7'de ele alınan sorunlar
 
@@ -93,4 +93,4 @@ Bunlar tekil deneyimlerdir; ürün genelinde oran veya doğrulanmış hata neden
 3. **P1: günlük işler.** Dosya kuyruğu/ilerleme/hız/devam etme; sohbet arama; cihaz başına görüntü ayarı; bağlantı tanılama çıktısı.
 4. **P2: dağıtım ve gelişmiş destek.** Geçerli Windows imzası, güvenli güncelleme, temiz kurulum testi; sonra rol değiştirme, izinli kayıt ve çizim. Gözetimsiz erişim, tünel ve yönetim işlemleri ayrı güvenlik değerlendirmesinden sonra.
 
-Her yeni sürüm doğrulandıktan sonra eski dağıtım kaldırılır. Kullanıcı verileri silinmez. Açık kaynak kararı verilmediği için mevcut lisans değiştirilmez.
+Her yeni sürüm doğrulandıktan sonra eski dağıtım kaldırılır. Kullanıcı verileri silinmez. Proje MIT lisansıyla açık kaynak olarak yayımlanır.

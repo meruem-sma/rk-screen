@@ -7,6 +7,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
 const { FileReceiver } = require('../src/core/file-store');
+const { FileSender } = require('../src/core/file-sender');
 const root = path.resolve(__dirname, '..');
 app.setPath('userData', path.join(root, 'review', 'e2e-test-profile'));
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -16,10 +17,11 @@ let server;
 const watchdog = setTimeout(() => {
   console.error('E2E timeout');
   app.exit(1);
-}, 90000);
+}, 150000);
 app
   .whenReady()
   .then(async () => {
+    await fs.mkdir(path.join(root, 'review'), { recursive: true });
     const peers = new Map();
     server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
     await new Promise((r) => server.once('listening', r));
@@ -53,6 +55,11 @@ app
         case 'end':
           s.session = null;
           await s.receiver.cancel();
+          await s.sender.cancel();
+          return;
+        case 'pauseControl':
+          s.session.controlPaused = args[1];
+          s.cursor = { ...s.cursor, control: args[1] ? 'manual' : 'none' };
           return;
         case 'permissions':
           Object.assign(s.session, args[1]);
@@ -66,7 +73,12 @@ app
           s.session.inputPaused = false;
           return true;
         case 'input':
-          if (s.session?.input && !s.session.inputPaused && args[1].videoKey === s.session.videoKey)
+          if (
+            s.session?.input &&
+            !s.session.inputPaused &&
+            !s.session.controlPaused &&
+            args[1].videoKey === s.session.videoKey
+          )
             s.inputs.push(args[1]);
           return;
         case 'inputKeepAlive':
@@ -107,6 +119,7 @@ app
           s.fileId = crypto.randomUUID();
           return { id: s.fileId, name: 'loopback.bin', size: s.payload.length };
         case 'readFile': {
+          if (s.sender.active) return s.sender.read(args[1]);
           if (s.offset === s.payload.length)
             return {
               done: true,
@@ -126,7 +139,12 @@ app
           return result;
         }
         case 'cancelFile':
+          await s.sender.cancel();
           return s.receiver.cancel();
+        case 'pickFiles':
+          return s.sender.enqueue(s.batchPaths || [s.payloadFile]);
+        case 'openFile':
+          return s.sender.open(args[1]);
         default:
           throw Error('Unknown test API: ' + method);
       }
@@ -203,7 +221,13 @@ app
         payload: i ? crypto.randomBytes(100123) : Buffer.alloc(0),
         receiver: new FileReceiver(dir),
         saved: [],
+        sender: new FileSender(),
+        payloadFile: path.join(runDirectory, `source-${i}.bin`),
       });
+      await fs.writeFile(
+        states.get(win.webContents.id).payloadFile,
+        states.get(win.webContents.id).payload,
+      );
       win.webContents.on('console-message', (details) => {
         if (details.level === 'error') errors.push(details.message);
       });
@@ -215,7 +239,7 @@ app
     const run = (w, code) =>
       w.webContents.executeJavaScript(code.trim().endsWith(';') ? '(()=>{' + code + '})()' : code);
     const wait = async (w, code) => {
-      for (let i = 0; i < 200; i++) {
+      for (let i = 0; i < 400; i++) {
         if (await run(w, code)) return;
         await delay(50);
       }
@@ -497,7 +521,7 @@ app
         host,
         "document.getElementById('host-input').checked=false;document.getElementById('host-input').dispatchEvent(new Event('change'));",
       );
-      await wait(controller, "document.getElementById('input-mode').disabled");
+      await wait(controller, "document.querySelector('#input-mode [value=control]').disabled");
       await run(
         host,
         "document.getElementById('host-input').checked=true;document.getElementById('host-input').dispatchEvent(new Event('change'));",
@@ -661,6 +685,66 @@ app
         "document.getElementById('transfer-title').textContent==='Dosya gönderildi'",
       );
       assert.equal((await fs.stat(controllerState.saved[0].path)).size, 0);
+      // Each file in a batch needs separate receiver consent.
+      controllerState.batchPaths = [controllerState.payloadFile, hostState.payloadFile];
+      await run(controller, "document.getElementById('send-file').click();");
+      await wait(host, "!document.getElementById('file-approval').hidden");
+      await run(host, "document.getElementById('accept-file').click();");
+      for (let i = 0; i < 800 && hostState.saved.length < 2; i++) await delay(25);
+      if (hostState.saved.length !== 2)
+        console.log(
+          'Batch state',
+          await run(
+            host,
+            "({title:document.getElementById('transfer-title').textContent,status:document.getElementById('transfer-status').textContent,toast:document.getElementById('toast').textContent,approval:!document.getElementById('file-approval').hidden})",
+          ),
+          await run(
+            controller,
+            "({title:document.getElementById('transfer-title').textContent,status:document.getElementById('transfer-status').textContent,toast:document.getElementById('toast').textContent})",
+          ),
+        );
+      assert.equal(hostState.saved.length, 2);
+      await wait(host, "!document.getElementById('file-approval').hidden");
+      assert.equal(hostState.saved.length, 2, 'second file must wait for consent');
+      await run(host, "document.getElementById('accept-file').click();");
+      for (let i = 0; i < 800 && hostState.saved.length < 3; i++) await delay(25);
+      assert.equal(hostState.saved.length, 3);
+      assert.deepEqual(await fs.readFile(hostState.saved[1].path), controllerState.payload);
+      assert.equal((await fs.stat(hostState.saved[2].path)).size, 0);
+      await wait(
+        controller,
+        "document.getElementById('transfer-title').textContent==='Dosya gönderildi'",
+      );
+      await run(host, "document.getElementById('host-pause').click();");
+      await wait(
+        controller,
+        "document.getElementById('session-state').textContent.includes('Uzak girdi bekliyor')",
+      );
+      const pausedInputs = hostState.inputs.length;
+      await run(
+        controller,
+        "const v=document.getElementById('viewport');v.focus();v.dispatchEvent(new KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true}));",
+      );
+      await delay(80);
+      assert.equal(hostState.inputs.length, pausedInputs);
+      await run(host, "document.getElementById('host-pause').click();");
+      await wait(
+        controller,
+        "!document.getElementById('session-state').textContent.includes('Uzak girdi bekliyor')",
+      );
+      await run(
+        controller,
+        "document.getElementById('input-mode').value='point';document.getElementById('input-mode').dispatchEvent(new Event('change'));",
+      );
+      await delay(80);
+      const beforeMark = hostState.inputs.length;
+      await run(
+        controller,
+        "const v=document.getElementById('viewport'),r=document.getElementById('video-stage').getBoundingClientRect();v.dispatchEvent(new PointerEvent('pointerdown',{clientX:r.left+r.width/2,clientY:r.top+r.height/2,button:0}));",
+      );
+      for (let i = 0; i < 50 && !hostState.pointers.some((p) => p.pulse); i++) await delay(20);
+      assert.ok(hostState.pointers.some((p) => p.pulse));
+      assert.equal(hostState.inputs.length, beforeMark, 'marking must not click or type');
       // Hidden Electron windows may return the previous compositor frame on the first capture.
       await controller.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true });
       await delay(200);
@@ -751,6 +835,9 @@ app
         clipboardNewText: true,
         receivedBytes: 100123,
         reverseEmptyFile: true,
+        approvedMultiFileQueue: true,
+        hostPauseBlocksKeyboard: true,
+        pointModeWithoutInput: true,
         approvalBeforeDiskWrite: true,
         disconnect: true,
         externalNetwork: false,

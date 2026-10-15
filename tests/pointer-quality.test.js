@@ -30,7 +30,7 @@ test('Remote injection preserves the separate local pointer and stale moves cann
   assert.deepEqual(c.local, { x: 50, y: 80 });
   c.observe({ x: 503, y: 600 }, 40);
   assert.deepEqual(c.local, { x: 503, y: 600 });
-  assert.equal(c.localUntil, 390);
+  assert.equal(c.localUntil, 1240);
   assert.equal(c.acceptMove(1), true);
   c.recordButton(5);
   assert.equal(c.acceptMove(4), false);

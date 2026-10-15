@@ -6,6 +6,7 @@ const root = path.resolve(__dirname, '..');
 app.setPath('userData', path.join(root, 'review', 'ui-test-profile'));
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 app.whenReady().then(async () => {
+  await fs.mkdir(path.join(root, 'review'), { recursive: true });
   const html = (await fs.readFile(path.join(root, 'index.html'), 'utf8'))
     .replace('src/peerjs.min.js', 'tests/mock-peer.js')
     .replaceAll('src="src/', 'src="../src/')
@@ -150,6 +151,18 @@ app.whenReady().then(async () => {
     );
     await delay(100);
     assert.equal(await run("document.querySelectorAll('#chat-messages img').length"), 0);
+    await run(
+      "document.getElementById('chat-search').value='bulunmayan';document.getElementById('chat-search').dispatchEvent(new Event('input'));",
+    );
+    assert.equal(await run("document.querySelector('.chat-bubble').hidden"), true);
+    await run(
+      "document.getElementById('chat-search').value='';document.getElementById('chat-search').dispatchEvent(new Event('input'));document.getElementById('chat-export').click();document.querySelector('.chat-copy').click();",
+    );
+    await wait('rkScreen.testState().exports.length===1 && rkScreen.testState().copied.length===1');
+    assert.equal(
+      await run('rkScreen.testState().exports[0][0].text'),
+      '<img src=x onerror=alert(1)>',
+    );
     await delay(150);
     await fs.writeFile(
       path.join(root, 'review', 'host-session.png'),
@@ -223,6 +236,29 @@ app.whenReady().then(async () => {
     await run(
       "document.getElementById('allow-requests').checked=true;document.getElementById('allow-requests').dispatchEvent(new Event('change'));",
     );
+    await run(
+      "localStorage.setItem('menzil_recents',JSON.stringify([{id:'987654321',name:'Arkadaşım',time:1}]));",
+    );
+    await win.loadFile(path.join(root, 'review', 'ui-fixture.html'));
+    await wait("document.querySelector('.favorite-button')!==null");
+    await run(
+      "document.querySelector('.favorite-button').click();document.querySelector('.recent-actions button:nth-child(2)').click();",
+    );
+    await wait("document.getElementById('device-dialog').open");
+    await run(
+      "document.getElementById('device-alias').value='Enes’in bilgisayarı';document.getElementById('device-form').dispatchEvent(new Event('submit',{cancelable:true}));",
+    );
+    await wait("document.getElementById('recents').textContent.includes('Enes’in bilgisayarı')");
+    assert.equal(await run("JSON.parse(localStorage.getItem('menzil_recents'))[0].favorite"), true);
+    await run(
+      "document.getElementById('nav-settings').click();document.getElementById('check-update').click();",
+    );
+    await wait("!document.getElementById('download-update').hidden");
+    assert.ok(
+      await run("document.getElementById('update-result').textContent.includes('20261016.1')"),
+    );
+    await run("document.getElementById('clear-recents').click();");
+    assert.equal(await run("JSON.parse(localStorage.getItem('menzil_recents')).length"), 1);
     // Valid JSON can still have the wrong shape or name an inherited object property.
     for (const prefs of [42, 'broken', [], { quality: 'constructor', clipboard: 'true' }]) {
       await run(

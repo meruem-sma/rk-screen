@@ -33,7 +33,7 @@
         Math.abs(point.y - this.injected.y) <= 1;
       if (moved && !injected) {
         this.local = { ...point };
-        if (this.physical) this.localUntil = now + 350;
+        if (this.physical) this.localUntil = now + 1200;
       }
       this.physical = { ...point };
     }

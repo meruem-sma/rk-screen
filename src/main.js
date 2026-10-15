@@ -9,25 +9,30 @@ const {
   clipboard,
   safeStorage,
   powerSaveBlocker,
+  shell,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const crypto = require('node:crypto');
 const { pathToFileURL } = require('node:url');
-const { FileReceiver, MAX_FILE_SIZE } = require('./core/file-store');
+const { FileReceiver } = require('./core/file-store');
+const { FileSender } = require('./core/file-sender');
+const sender = new FileSender();
 const { validMessage, inputTypes, validVideoKey } = require('./core/session');
 const { cleanName, CursorOwnership } = require('./core/pointer');
 const { CursorOverlay } = require('./cursor-overlay');
 const pointerOverlay = new CursorOverlay();
+const localPointerOverlay = new CursorOverlay();
 // Keep existing installed users' local settings during the product rename.
 const legacyProfile = path.join(app.getPath('appData'), 'Menzil');
 if (app.isPackaged && fsSync.existsSync(legacyProfile)) app.setPath('userData', legacyProfile);
 let win,
   session = null,
   injector = null,
-  receiver,
-  outbound = null;
+  receiver;
+let checkedUpdate = null,
+  checkingUpdate = null;
 let fileQueue = Promise.resolve();
 let powerBlocker = null;
 const runtimeFile = path.join(app.getPath('userData'), 'runtime.json');
@@ -80,14 +85,11 @@ function authorized(token) {
 }
 async function closeFiles() {
   await receiver?.cancel();
-  if (outbound) {
-    const previous = outbound;
-    outbound = null;
-    await previous.handle.close().catch(() => {});
-  }
+  await sender.cancel();
 }
 function endSession() {
   pointerOverlay.close();
+  localPointerOverlay.close();
   session = null;
   if (win && !win.isDestroyed() && win.isFullScreen()) win.setFullScreen(false);
   try {
@@ -166,6 +168,62 @@ handle('app-info', () => ({
   build: require('../package.json').rkScreenBuild,
   compatibility,
 }));
+handle('check-update', async () => {
+  if (!checkingUpdate) {
+    checkedUpdate = null;
+    checkingUpdate = require('./core/updates')
+      .checkUpdate({
+        version: app.getVersion(),
+        build: require('../package.json').rkScreenBuild,
+      })
+      .then((result) => (checkedUpdate = result))
+      .finally(() => {
+        checkingUpdate = null;
+      });
+  }
+  return checkingUpdate;
+});
+handle('open-update', async () => {
+  if (!checkedUpdate?.available) throw Error('Önce güncellemeleri kontrol edin.');
+  await shell.openExternal(checkedUpdate.url);
+});
+handle('copy-text', async (text) => {
+  if (typeof text !== 'string' || text.length > 4000) throw Error('Kopyalanacak metin çok uzun.');
+  await clipboard.writeText(text);
+});
+handle('export-chat', async (messages) => {
+  if (
+    !session ||
+    !Array.isArray(messages) ||
+    messages.length > 200 ||
+    messages.some(
+      (m) =>
+        !m ||
+        typeof m.text !== 'string' ||
+        m.text.length > 4000 ||
+        typeof m.mine !== 'boolean' ||
+        !Number.isFinite(m.time),
+    )
+  )
+    throw Error('Geçersiz sohbet kaydı.');
+  const result = await dialog.showSaveDialog(win, {
+    title: 'Bu oturumun sohbetini kaydet',
+    defaultPath: path.join(app.getPath('downloads'), 'RK-Screen-sohbet.txt'),
+    filters: [{ name: 'Metin', extensions: ['txt'] }],
+  });
+  if (result.canceled || !result.filePath) return false;
+  await fs.writeFile(
+    result.filePath,
+    messages
+      .map(
+        (m) =>
+          `[${new Date(m.time).toLocaleString('tr-TR')}] ${m.mine ? 'Ben' : 'Karşı taraf'}: ${m.text}`,
+      )
+      .join('\n\n'),
+    'utf8',
+  );
+  return true;
+});
 handle('compatibility', async (value) => {
   if (typeof value !== 'boolean') throw new Error('Geçersiz ayar.');
   await fs.mkdir(path.dirname(runtimeFile), { recursive: true });
@@ -225,6 +283,7 @@ handle('save-diagnostics', async (events) => {
     JSON.stringify(
       {
         version: app.getVersion(),
+        build: require('../package.json').rkScreenBuild,
         electron: process.versions.electron,
         createdAt: new Date().toISOString(),
         events: safe,
@@ -275,6 +334,7 @@ handle('session-begin', async (options) => {
     cursor: new CursorOwnership(),
     input: options.role === 'host' && options.input === true,
     inputPaused: true,
+    controlPaused: false,
     videoKey: null,
     clipboard: options.clipboard === true,
     display,
@@ -295,6 +355,7 @@ handle('video-state', (token, options) => {
   // Block input before releasing keys or changing the coordinate target.
   s.inputPaused = true;
   pointerOverlay.hide();
+  localPointerOverlay.hide();
   injector?.releaseAll();
   const sameDisplay = s.display?.id === display.id;
   const changedVideoKey = s.videoKey !== options.videoKey;
@@ -326,7 +387,7 @@ handle('pointer', (token, data) => {
     return true;
   }
   const now = Date.now();
-  if (now - s.lastPointerTime < 30) return false;
+  if (!data.pulse && now - s.lastPointerTime < 30) return false;
   s.lastPointerTime = now;
   pointerOverlay.update(s.display.bounds, data, s.remoteName);
   return true;
@@ -344,9 +405,22 @@ handle('permissions', (token, permissions) => {
   s.clipboard = permissions.clipboard === true;
   if (!s.input) injector?.releaseAll();
 });
+handle('pause-control', (token, paused) => {
+  const s = authorized(token);
+  if (s.role !== 'host' || typeof paused !== 'boolean') throw Error('Geçersiz kontrol isteği.');
+  s.controlPaused = paused;
+  if (paused) injector?.releaseAll();
+});
 handle('input-keepalive', (token) => {
   const s = authorized(token);
-  if (s.role !== 'host' || !s.input || s.inputPaused) return false;
+  if (
+    s.role !== 'host' ||
+    !s.input ||
+    s.inputPaused ||
+    s.controlPaused ||
+    Date.now() < s.cursor.localUntil
+  )
+    return false;
   injector?.keepAlive();
   return true;
 });
@@ -371,6 +445,10 @@ handle('input', (token, data) => {
     return true;
   }
   s.cursor.observe(injector.position(), Date.now());
+  if (s.controlPaused || Date.now() < s.cursor.localUntil) {
+    injector.releaseAll();
+    return false;
+  }
   const b = s.display.bounds;
   const dip = {
     x: b.x + Math.round((b.width - 1) * (data.x || 0)),
@@ -402,13 +480,23 @@ handle('cursor', (token) => {
   if (s.role !== 'host') return null;
   const b = s.display.bounds;
   s.cursor.observe(screen.dipToScreenPoint(screen.getCursorScreenPoint()), Date.now());
+  const control = s.controlPaused ? 'manual' : Date.now() < s.cursor.localUntil ? 'local' : 'none';
+  if (control !== 'none') injector?.releaseAll();
   const p = s.cursor.local ? screen.screenToDipPoint(s.cursor.local) : null;
-  if (!p) return { x: 0, y: 0, visible: false };
+  if (!p) return { x: 0, y: 0, visible: false, control };
+  const inside = p.x >= b.x && p.y >= b.y && p.x < b.x + b.width && p.y < b.y + b.height;
+  const normalized = {
+    x: (p.x - b.x) / Math.max(1, b.width - 1),
+    y: (p.y - b.y) / Math.max(1, b.height - 1),
+  };
+  if (inside && s.pointerEnabled && !s.inputPaused && s.cursor.injected && control === 'none')
+    localPointerOverlay.update(b, normalized, require('node:os').hostname(), 'local');
+  else localPointerOverlay.hide();
   return {
-    x: Math.max(0, Math.min(1, (p.x - b.x) / b.width)),
-    y: Math.max(0, Math.min(1, (p.y - b.y) / b.height)),
-    visible:
-      !s.inputPaused && p.x >= b.x && p.y >= b.y && p.x < b.x + b.width && p.y < b.y + b.height,
+    control,
+    x: Math.max(0, Math.min(1, normalized.x)),
+    y: Math.max(0, Math.min(1, normalized.y)),
+    visible: !s.inputPaused && inside,
   };
 });
 handle('clipboard-read', async (token) => {
@@ -430,53 +518,39 @@ handle('fullscreen', () => {
   win.setFullScreen(!win.isFullScreen());
   return win.isFullScreen();
 });
-handle('file-select', async (token, droppedPath) => {
+async function pickFiles(token, droppedPaths, multiple) {
   authorized(token);
   const result =
-    typeof droppedPath === 'string' && path.isAbsolute(droppedPath)
-      ? { canceled: false, filePaths: [droppedPath] }
-      : await dialog.showOpenDialog(win, { title: 'Dosya gönder', properties: ['openFile'] });
+    Array.isArray(droppedPaths) &&
+    droppedPaths.length &&
+    droppedPaths.every((p) => typeof p === 'string' && path.isAbsolute(p))
+      ? { canceled: false, filePaths: droppedPaths }
+      : await dialog.showOpenDialog(win, {
+          title: 'Dosyaları kuyruğa ekle',
+          properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+        });
   if (result.canceled) return null;
   return serialized(async () => {
     authorized(token);
-    if (outbound) throw new Error('Bir dosya aktarımı zaten sürüyor.');
-    const handle = await fs.open(result.filePaths[0], 'r');
-    try {
-      const stat = await handle.stat();
-      if (!stat.isFile() || stat.size > MAX_FILE_SIZE)
-        throw new Error('En fazla 512 MB boyutunda bir dosya seçin.');
-      outbound = {
-        id: crypto.randomUUID(),
-        handle,
-        size: stat.size,
-        offset: 0,
-        hash: crypto.createHash('sha256'),
-      };
-      return { id: outbound.id, name: path.basename(result.filePaths[0]), size: stat.size };
-    } catch (err) {
-      await handle.close();
-      throw err;
-    }
+    if (!multiple && sender.active) throw Error('Bir dosya aktarımı zaten sürüyor.');
+    const selected = await sender.enqueue(result.filePaths);
+    return multiple ? selected : sender.open(selected[0].id);
   });
-});
+}
+handle('file-select', (token, droppedPath) =>
+  pickFiles(token, droppedPath ? [droppedPath] : null, false),
+);
+handle('file-pick', (token, droppedPaths) => pickFiles(token, droppedPaths, true));
+handle('file-open', (token, id) =>
+  serialized(() => {
+    authorized(token);
+    return sender.open(id);
+  }),
+);
 handle('file-read', (token, id) =>
   serialized(async () => {
     authorized(token);
-    const f = outbound;
-    if (!f || f.id !== id) throw new Error('Dosya aktarımı kapandı.');
-    if (f.offset === f.size) {
-      const hash = f.hash.digest('hex');
-      await f.handle.close();
-      outbound = null;
-      return { done: true, hash };
-    }
-    const buffer = Buffer.alloc(Math.min(32768, f.size - f.offset));
-    const { bytesRead } = await f.handle.read(buffer, 0, buffer.length, f.offset);
-    if (!bytesRead) throw new Error('Dosya okunamadı.');
-    f.offset += bytesRead;
-    const bytes = buffer.subarray(0, bytesRead);
-    f.hash.update(bytes);
-    return { data: bytes.toString('base64'), bytes: f.offset };
+    return sender.read(id);
   }),
 );
 handle('file-begin', (token, meta) =>

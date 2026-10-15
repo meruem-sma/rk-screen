@@ -1,6 +1,6 @@
-# RK Screen 0.7 — güvenlik modeli ve üretim öncesi işler
+# RK Screen Beta 1 — güvenlik modeli ve üretim öncesi işler
 
-Güncelleme: 2 Ekim 2026. Bu belge mevcut kodun sınırlarını ve sonraki doğrulama işlerini tanımlar; bağımsız güvenlik denetimi veya ürün sertifikası değildir.
+Güncelleme: 15 Ekim 2026. Bu belge mevcut kodun sınırlarını ve sonraki doğrulama işlerini tanımlar; bağımsız güvenlik denetimi veya ürün sertifikası değildir. Yayın ve test kapsamının güncel kaydı [GUNCEL-DURUM.md](GUNCEL-DURUM.md) içindedir.
 
 ## Korunan veriler ve yetkiler
 
@@ -11,11 +11,11 @@ Ekran ve isteğe bağlı sistem sesi, fare/klavye kontrolü, pano metni ve kulla
 1. **Uzak istemci → uygulama:** İleti içeriği güvenilmezdir. Seçili ve onaylanmış veri bağlantısı dışındaki bağlantılar oturum işletemez. Mesaj türü, alanlar ve boyut sınırları kontrol edilir. Cihaz adı kimlik kanıtı değildir.
 2. **Arayüz → Windows işlemleri:** Renderer ayrı ve sandbox içindedir. Preload sınırlı işlemler sunar. Ana süreç, çağıran pencere/ana çerçeve, dosya URL'si, rastgele yerel oturum belirteci, rol ve izinleri yeniden denetler. Yerel oturum belirteci uzak cihaza gönderilmez.
 3. **Veri bağlantısı → video bağlantısı:** Video çağrısı onaylı karşı cihaz, protokol sürümü ve mevcut görüntü anahtarıyla eşleşmelidir. Her yenilemede rastgele UUIDv4 anahtarı değişir; eski anahtarla gelen çağrı ve kontrol girdileri kabul edilmez.
-4. **Uygulama → bağlantı hizmetleri:** PeerJS Cloud ve herkese açık STUN/TURN kullanılmaktadır. Sunucuların erişilebilirliği ve güvenliği uygulamanın kontrolünde değildir. WebRTC taşıma şifrelemesi, kullanıcıya gösterilen cihaz kimliğinin doğrulandığı anlamına gelmez.
+4. **Uygulama → bağlantı hizmetleri:** PeerJS Cloud ve herkese açık STUN kullanılır; çalışan varsayılan TURN yoktur. İsteğe bağlı TURN kullanıcı tarafından yapılandırılır. Sunucuların erişilebilirliği ve güvenliği uygulamanın kontrolünde değildir. WebRTC taşıma şifrelemesi, kullanıcıya gösterilen cihaz kimliğinin doğrulandığı anlamına gelmez. İki tarafta gösterilen DTLS bağlantı doğrulama kodu güvenilir başka bir iletişim yoluyla karşılaştırılmalıdır; kalıcı cihaz kimliği değildir.
 
 Görüntü anahtarı, veri kanalına erişebilen onaylı karşı tarafa gönderilir ve video çağrısı metadata'sında kullanılır. Bu bir cihaz parolası, kimlik doğrulama protokolü veya sinyalleşme sunucusu ele geçirilmesine karşı kanıt değildir. Yeni kare bildirimi, normal istemcinin görüntüyü çözdüğünü bildirir; kötü niyetli onaylı bir istemcinin dürüst davrandığını kanıtlamaz.
 
-## 0.6 ile güçlenen ekran geçişi
+## Ekran geçişi
 
 Paylaşan taraftaki arayüz bağlı ekranları önizler ve kullanıcının seçimini alır. Uzak protokol, başka monitör seçen bir komut sunmaz. Yeni yakalama başarısızsa mevcut akış korunur. Yakalama beklerken iptal edilen veya oturumu kapanan bir iş sonradan tamamlanırsa ürettiği akış kapatılır.
 
@@ -58,8 +58,8 @@ Bu sürüm sunucu kurmaz, özel altyapıya bağlanmaz ve kimlik doğrulanmış g
 - [Electron desktopCapturer](https://www.electronjs.org/docs/latest/api/desktop-capturer/): ekran yakalama API'si.
 - [MediaStreamTrack.stop](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack/stop): açık yakalamaların sonlandırılması; `stop()` çağrısı `ended` olayını kendiliğinden üretmez.
 
-Kod: `src/main.js`, `src/core/session.js`, `src/renderer.js`, `src/core/file-store.js`. Sonuçlar: `SISTEM-DENETIMI.md`, `review/e2e-results.json`, `review/native-results.json`.
+Kod: `src/main.js`, `src/core/session.js`, `src/renderer.js`, `src/core/file-store.js`. Tekrarlanabilir doğrulamalar `tests/` içindedir. Testler `review/` altında geçici sonuçlar üretir; bu klasör dağıtımın parçası değildir ve testler arasında temizlenebilir.
 
-## 0.7 isimli işaretçi sınırı
+## İsimli işaretçi sınırı
 
 İşaretçi, onaylı oturum ve güncel görüntü anahtarı gerektirir; Windows kontrol girdisi üretmez. Paylaşan taraf işaretçiyi kapatabilir. Ad, oturum başlangıcındaki bilgisayar adından alınır; her konum mesajıyla değiştirilemez ve doğrulanmış kimlik değildir. Etiket metin olarak gösterilir, kontrol/bidi karakterleri temizlenir. Pencere sandbox içindedir; yalnızca konum/etiket alan bir köprüsü vardır, ana süreç işlem yetkilerine erişimi yoktur. Oturum sonunda pencere kapatılır.

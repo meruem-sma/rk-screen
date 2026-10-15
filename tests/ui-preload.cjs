@@ -1,8 +1,18 @@
 const { contextBridge } = require('electron');
 let session = null;
-const state = { inputs: [], writes: [], readCount: 0, reports: [] };
+const state = { inputs: [], writes: [], readCount: 0, reports: [], exports: [], copied: [] };
 contextBridge.exposeInMainWorld('rkScreen', {
-  info: async () => ({ name: 'Çalışma bilgisayarı', version: '1.0.0-beta.1', build: '20261015.1' }),
+  info: async () => ({ name: 'Çalışma bilgisayarı', version: '1.0.0-beta.1', build: '20261015.2' }),
+  checkUpdate: async () => ({ available: true, build: '20261016.1', signed: false }),
+  openUpdate: async () => {},
+  copyText: async (text) => state.copied.push(text),
+  exportChat: async (messages) => {
+    state.exports.push(messages);
+    return true;
+  },
+  pauseControl: async (_t, paused) => {
+    session.controlPaused = paused;
+  },
   connectionConfig: async () => ({ iceServers: [] }),
   saveDiagnostics: async (events) => {
     state.reports.push(events);

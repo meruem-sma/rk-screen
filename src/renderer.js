@@ -6,6 +6,7 @@
   const { SessionGate, validMessage, inputTypes, RequestLimiter, validVideoKey } =
     window.RKScreenSession;
   const requestLimiter = new RequestLimiter();
+  let traffic = new window.RKScreenSession.SessionTraffic();
   const pendingChats = new Map(),
     receivedChats = new Set();
   const gate = new SessionGate(),
@@ -52,6 +53,7 @@
     deviceId = '',
     connectedName = '';
   let quality = 'balanced',
+    remotePaused = false,
     remoteInput = false,
     remoteClipboard = false,
     online = false,
@@ -79,7 +81,11 @@
     fileTimer = null,
     fileQueue = Promise.resolve(),
     selectingFile = false,
-    queuedFileMessages = 0;
+    queuedFileMessages = 0,
+    outgoingFiles = [],
+    drainingFiles = false,
+    editingDevice = null,
+    fileBitrate = 1000000;
   const read = (key, fallback) => {
     try {
       return JSON.parse(localStorage.getItem(key)) ?? fallback;
@@ -106,6 +112,8 @@
     toastTimer = setTimeout(() => ($('toast').hidden = true), error ? 7000 : 4000);
   }
   function errorText(err) {
+    if (err?.type || ['NotAllowedError', 'NotReadableError'].includes(err?.name))
+      return window.RKScreenErrors.explain(err, navigator.onLine);
     return String(err?.message || err).replace(
       /^Error invoking remote method '[^']+': Error: /,
       '',
@@ -151,7 +159,11 @@
       if (inputTypes.has(data.type)) data = { ...data, videoKey };
       if (['mouse-move', 'mouse-button'].includes(data.type))
         data = { ...data, sequence: ++inputSequence };
-      if (conn === gate.connection && ['mouse-move', 'cursor', 'pointer'].includes(data.type)) {
+      if (
+        conn === gate.connection &&
+        ['mouse-move', 'cursor', 'pointer'].includes(data.type) &&
+        !data.pulse
+      ) {
         if (liveLane?.send(data)) return true;
         if ((conn.dataChannel?.bufferedAmount || 0) > 16384) return false;
       }
@@ -180,13 +192,14 @@
     $('page-label').textContent = settings ? 'Ayarlar' : 'Bağlantı';
   }
   function recentItems() {
-    const list = read('menzil_recents', []);
-    return Array.isArray(list) ? list.filter((x) => x && /^\d{9}$/.test(x.id)).slice(0, 5) : [];
+    return window.RKScreenDevices.normalize(read('menzil_recents', []));
   }
   function renderRecents() {
     const root = $('recents');
     root.replaceChildren();
-    const items = recentItems();
+    const items = recentItems().sort(
+      (a, b) => Number(b.favorite) - Number(a.favorite) || b.time - a.time,
+    );
     if (!items.length) {
       const row = document.createElement('div');
       row.className = 'recent-empty';
@@ -203,7 +216,7 @@
       const text = document.createElement('div'),
         title = document.createElement('strong'),
         caption = document.createElement('small');
-      title.textContent = window.RKScreenPointer.cleanName(item.name);
+      title.textContent = item.alias || item.name;
       caption.textContent = formatted(item.id);
       text.append(title, caption);
       const button = document.createElement('button');
@@ -213,19 +226,47 @@
         $('remote-id').value = formatted(item.id);
         connect(item.id).catch((e) => toast(errorText(e), true));
       });
-      row.append(icon, text, button);
+      const actions = document.createElement('div');
+      actions.className = 'recent-actions';
+      const favorite = document.createElement('button');
+      favorite.className = 'text-button favorite-button';
+      favorite.textContent = item.favorite ? '★' : '☆';
+      favorite.setAttribute('aria-pressed', String(item.favorite));
+      favorite.setAttribute('aria-label', item.favorite ? 'Favoriden kaldır' : 'Favoriye ekle');
+      favorite.addEventListener('click', () => {
+        write(
+          'menzil_recents',
+          recentItems().map((v) => (v.id === item.id ? { ...v, favorite: !v.favorite } : v)),
+        );
+        renderRecents();
+      });
+      const rename = document.createElement('button');
+      rename.className = 'text-button';
+      rename.textContent = 'Adlandır';
+      rename.addEventListener('click', () => {
+        editingDevice = item.id;
+        $('device-alias').value = item.alias;
+        $('device-dialog').showModal();
+        $('device-alias').focus();
+      });
+      const remove = document.createElement('button');
+      remove.className = 'text-button';
+      remove.textContent = 'Sil';
+      remove.addEventListener('click', () => {
+        write(
+          'menzil_recents',
+          recentItems().filter((v) => v.id !== item.id),
+        );
+        renderRecents();
+      });
+      actions.append(favorite, rename, remove, button);
+      row.append(icon, text, actions);
       root.append(row);
     }
     refreshControls();
   }
   function saveRecent(id, remoteName) {
-    write(
-      'menzil_recents',
-      [
-        { id, name: remoteName, time: Date.now() },
-        ...recentItems().filter((x) => x.id !== id),
-      ].slice(0, 5),
-    );
+    write('menzil_recents', window.RKScreenDevices.remember(recentItems(), id, remoteName));
     renderRecents();
   }
   function newDeviceId() {
@@ -313,18 +354,16 @@
       }
       if (err.type === 'peer-unavailable') {
         cleanup();
-        message(
-          'Cihaz bulunamadı. Kimliği ve karşı cihazdaki RK Screen sürümünü kontrol edin.',
-          true,
-        );
+        message(window.RKScreenErrors.explain(err, navigator.onLine), true);
         return;
       }
       if (['network', 'socket-error', 'socket-closed', 'server-error'].includes(err.type)) {
         network('offline', 'Bağlantı hizmeti yeniden deneniyor');
+        message(window.RKScreenErrors.explain(err, navigator.onLine), true);
         reconnectSignaling(ownerPeer);
       } else if (gate.connection && !gate.approved) {
         cleanup();
-        message('Bağlantı kurulamadı. Karşı cihazın sürümünü ve ağı kontrol edin.', true);
+        message(window.RKScreenErrors.explain(err, navigator.onLine), true);
       } else if (err.type === 'webrtc' && media) scheduleVideoRecovery(media);
     });
     peer.on('connection', (conn) => {
@@ -510,6 +549,7 @@
     });
   }
   function bindConnection(conn) {
+    traffic = new window.RKScreenSession.SessionTraffic();
     liveLane = new RealtimeLane(conn.peerConnection, (data) => {
       if (gate.allows(conn)) handleData(conn, data).catch(() => {});
     });
@@ -525,10 +565,14 @@
       if (gate.connection === conn) cleanup('Bağlantı sona erdi.');
     });
     conn.on('error', () => {
-      if (gate.connection === conn) cleanup('Veri bağlantısı kesildi.');
+      if (gate.connection === conn) cleanup(window.RKScreenErrors.explain('disconnected'));
     });
   }
   async function connect(id) {
+    if (!navigator.onLine) {
+      message(window.RKScreenErrors.explain('offline'), true);
+      return;
+    }
     if (!api || !online || gate.connection) return;
     if (!/^\d{9}$/.test(id)) {
       message('Dokuz haneli cihaz kimliğini girin.', true);
@@ -548,10 +592,7 @@
     bindConnection(conn);
     refreshControls();
     message('Karşı bilgisayara bağlanılıyor…');
-    armTimeout(
-      25000,
-      'Cihaza ulaşılamadı. İki cihazın sürümünü ve çevrimiçi durumunu kontrol edin. Bazı ağlarda geçerli aktarma sunucusu gerekir.',
-    );
+    armTimeout(25000, window.RKScreenErrors.explain('timeout'));
     conn.on('open', () => {
       if (gate.connection !== conn) return;
       message('Karşı tarafın onayı bekleniyor…');
@@ -814,16 +855,7 @@
       if (gate.role !== 'controller') return;
       if (m.type === 'denied') {
         cleanup();
-        message(
-          {
-            busy: 'Cihaz başka bir oturumda.',
-            version: 'İki cihazda aynı RK Screen sürümünü kullanın.',
-            disabled: 'Karşı cihaz gelen istekleri kapatmış.',
-            rate: 'Çok sık bağlantı denendi. Bir dakika sonra tekrar deneyin.',
-            capture: 'Karşı cihaz ekran paylaşımını başlatamadı.',
-          }[m.reason] || 'Bağlantı isteği reddedildi.',
-          true,
-        );
+        message(window.RKScreenErrors.explain(m.reason), true);
         return;
       }
       if (
@@ -856,7 +888,8 @@
       $('remote-session').hidden = false;
       prepareControllerVideo();
       $('input-mode').value = remoteInput ? 'control' : 'view';
-      $('input-mode').disabled = !remoteInput;
+      $('input-mode').disabled = false;
+      $('input-mode').querySelector('[value="control"]').disabled = !remoteInput;
       updateControlStatus();
       $('viewport').focus();
       quality = prefs.quality;
@@ -871,7 +904,7 @@
       refreshControls();
       return;
     }
-    if (!validMessage(m) || !token) return;
+    if (!validMessage(m) || !token || !traffic.allow(m.type)) return;
     if (inputTypes.has(m.type)) {
       if (gate.role === 'host') {
         try {
@@ -967,7 +1000,8 @@
           const wasAllowed = remoteInput;
           remoteInput = m.input;
           if (!wasAllowed && remoteInput) $('input-mode').value = 'control';
-          $('input-mode').disabled = !remoteInput;
+          $('input-mode').disabled = false;
+          $('input-mode').querySelector('[value="control"]').disabled = !remoteInput;
           if (!remoteInput) {
             $('input-mode').value = 'view';
             send({ type: 'release-input' });
@@ -993,7 +1027,17 @@
         break;
       case 'cursor':
         if (gate.role === 'controller' && m.videoKey === videoKey) {
+          const paused = m.control === 'local' || m.control === 'manual';
+          if (paused && !remotePaused) releaseInput(false);
+          remotePaused = paused;
+          $('input-help').textContent =
+            m.control === 'manual'
+              ? 'Ekran sahibi uzak kontrolü duraklattı. İşaretçi kullanılabilir.'
+              : paused
+                ? 'Ekran sahibi faresini kullanıyor; uzak fare ve klavye bekliyor.'
+                : 'Ekran sahibi faresini kullanırken uzak fare ve klavye bekler.';
           lastCursor = m;
+          updateControlStatus();
           positionCursor();
         }
         break;
@@ -1101,6 +1145,9 @@
     qualityWarning = false;
     oldStats = null;
     clipboardBaseline = null;
+    remotePaused = false;
+    $('host-pause').setAttribute('aria-pressed', 'false');
+    $('host-pause').textContent = 'Kontrolü duraklat';
     $('chat-partner').textContent = connectedName;
     const owner = gate.connection;
     let pollingCursor = false;
@@ -1170,6 +1217,7 @@
           if (gate.connection !== owner || media !== currentMedia || videoKey !== currentKey)
             return;
           const route = selectedRoute(stats);
+          fileBitrate = Math.max(64000, Math.min(2000000, (route.available || 4000000) * 0.25));
           const routeLabel =
             route.route === 'relay'
               ? 'Aktarma sunucusu'
@@ -1185,8 +1233,11 @@
               const source = stream?.getVideoTracks()[0]?.getSettings() || {};
               const profile = qualitySettings(quality, source.width, source.height);
               changed =
-                adaptive.update(profile, { ...route, limitation: r.qualityLimitationReason }) ||
-                changed;
+                adaptive.update(profile, {
+                  ...route,
+                  limitation: r.qualityLimitationReason,
+                  loss: window.RKScreenTransport.remoteLoss(stats.get(r.remoteId)),
+                }) || changed;
               const effective = adaptive.limits(profile);
               diagnostics.record('video', {
                 profile: quality,
@@ -1300,6 +1351,8 @@
       w.reject(new Error('Aktarım iptal edildi.'));
     }
     transfer?.chunks?.cancel(new Error('Bağlantı sona erdi.'));
+    transfer?.abort?.abort();
+    outgoingFiles = [];
     transfer = null;
     $('transfer-panel').hidden = true;
     $('file-approval').hidden = true;
@@ -1339,6 +1392,7 @@
     pendingChats.clear();
     receivedChats.clear();
     $('chat-input').value = '';
+    $('chat-search').value = '';
     $('chat-count').textContent = '0 / 4000';
     $('chat-new').hidden = true;
     $('chat-messages').replaceChildren();
@@ -1346,11 +1400,12 @@
     $('chat-unread').hidden = true;
     pressedButtons.clear();
     remoteInput = false;
+    remotePaused = false;
     remoteClipboard = false;
     $('host-code').textContent = $('session-code').textContent = 'Doğrulama kodu bekleniyor';
     clipboardBaseline = null;
     refreshControls();
-    message('Bağlantı, karşı tarafın onayıyla başlar.');
+    message(reason || 'Bağlantı, karşı tarafın onayıyla başlar.', !!reason);
     if (reason) toast(reason);
     // A destroyed signaling peer could not be replaced while the session was active.
     if (!online && peer) reconnectSignaling(peer);
@@ -1364,6 +1419,9 @@
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble' + (mine ? ' mine' : '');
     bubble.dataset.messageId = id;
+    bubble.dataset.time = String(Date.now());
+    bubble.dataset.text = text;
+    bubble.dataset.mine = String(mine);
     const body = document.createElement('p');
     body.className = 'chat-text';
     body.textContent = text;
@@ -1374,6 +1432,17 @@
       minute: '2-digit',
     });
     bubble.append(time);
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'text-button chat-copy';
+    copy.textContent = 'Kopyala';
+    copy.addEventListener('click', () =>
+      api
+        ?.copyText?.(text)
+        .then(() => toast('Mesaj kopyalandı.'))
+        .catch((err) => toast(errorText(err), true)),
+    );
+    bubble.append(copy);
     if (mine) {
       const status = document.createElement('span');
       status.className = 'chat-delivery';
@@ -1390,6 +1459,7 @@
       retry.addEventListener('click', () => deliverChat(item));
     }
     root.append(bubble);
+    filterChat();
     while (root.children.length > 200) {
       const old = root.firstChild,
         item = pendingChats.get(old.dataset.messageId);
@@ -1407,6 +1477,11 @@
       $('chat-unread').textContent = unread > 99 ? '99+' : String(unread);
       toast('Yeni sohbet mesajı');
     }
+  }
+  function filterChat() {
+    const query = $('chat-search').value.toLocaleLowerCase('tr-TR');
+    for (const bubble of $('chat-messages').querySelectorAll('.chat-bubble'))
+      bubble.hidden = !bubble.dataset.text.toLocaleLowerCase('tr-TR').includes(query);
   }
   function deliverChat(item) {
     clearTimeout(item.timer);
@@ -1448,6 +1523,7 @@
       gate.approved &&
       gate.role === 'controller' &&
       remoteInput &&
+      !remotePaused &&
       !refreshingVideo &&
       $('video-wait').hidden &&
       $('input-mode').value === 'control'
@@ -1456,6 +1532,14 @@
   function updateControlStatus() {
     if (refreshingVideo) {
       $('session-state').textContent = 'Görüntü hazırlanıyor · Kontrol beklemede';
+      return;
+    }
+    if (remotePaused) {
+      $('session-state').textContent = 'Ekran sahibinde kontrol · Uzak girdi bekliyor';
+      return;
+    }
+    if ($('input-mode').value === 'point') {
+      $('session-state').textContent = 'İşaretleme · Tıklama ve klavye gönderilmez';
       return;
     }
     const active = canControl();
@@ -1529,12 +1613,14 @@
     lastMouse = performance.now();
     send({ type: 'mouse-move', ...p });
   }
-  function releaseInput() {
-    ownCursor = null;
-    $('self-cursor').hidden = true;
-    $('viewport').classList.remove('viewport-pointer-active');
-    pendingPointer = null;
-    if (gate.approved && gate.role === 'controller' && videoKey)
+  function releaseInput(clearPointer = true) {
+    if (clearPointer) {
+      ownCursor = null;
+      $('self-cursor').hidden = true;
+      $('viewport').classList.remove('viewport-pointer-active');
+      pendingPointer = null;
+    }
+    if (clearPointer && gate.approved && gate.role === 'controller' && videoKey)
       send({ type: 'pointer', x: 0, y: 0, visible: false, videoKey });
     clearTimeout(mouseTimer);
     mouseTimer = null;
@@ -1560,6 +1646,21 @@
     });
     viewport.addEventListener('pointerdown', (e) => {
       viewport.focus();
+      if (
+        gate.approved &&
+        gate.role === 'controller' &&
+        !refreshingVideo &&
+        $('input-mode').value === 'point'
+      ) {
+        const p = coords(e);
+        if (p) {
+          e.preventDefault();
+          send({ type: 'pointer', ...p, visible: true, pulse: true, videoKey });
+          $('self-cursor').classList.add('pulse');
+          setTimeout(() => $('self-cursor').classList.remove('pulse'), 900);
+        }
+        return;
+      }
       if (!canControl() || e.button > 2) return;
       const p = coords(e);
       if (!p) return;
@@ -1723,6 +1824,9 @@
   async function cancelTransfer(notify = true) {
     const previous = transfer;
     transfer = null;
+    previous?.abort?.abort();
+    outgoingFiles = [];
+    updateFileQueue();
     previous?.chunks?.cancel();
     clearTimeout(fileTimer);
     if (fileWaiter) {
@@ -1738,30 +1842,67 @@
   }
   async function sendFile(droppedFile) {
     if (!token || !gate.approved || selectingFile) return;
-    if (transfer) {
+    if (transfer && !api.pickFiles) {
       toast('Önce devam eden aktarımı bitirin.');
       return;
     }
     const owner = gate.connection,
       currentToken = token;
     selectingFile = true;
-    let meta;
+    let selected;
     try {
-      meta = droppedFile
-        ? await api.droppedFile(currentToken, droppedFile)
-        : await api.selectFile(currentToken);
+      if (api.pickFiles)
+        selected = await api.pickFiles(
+          currentToken,
+          droppedFile ? (Array.isArray(droppedFile) ? droppedFile : [droppedFile]) : null,
+        );
+      else {
+        const meta = droppedFile
+          ? await api.droppedFile(currentToken, droppedFile)
+          : await api.selectFile(currentToken);
+        selected = meta ? [meta] : null;
+      }
     } finally {
       selectingFile = false;
     }
-    if (!meta) return;
-    if (gate.connection !== owner) return;
-    if (transfer) {
-      await api.cancelFile(currentToken);
-      toast('Başka bir dosya aktarımı başladı. Lütfen yeniden deneyin.');
-      return;
+    if (!selected?.length || gate.connection !== owner) return;
+    outgoingFiles.push(...selected);
+    updateFileQueue();
+    await pumpFiles();
+  }
+  function updateFileQueue() {
+    $('transfer-queue').textContent = outgoingFiles.length
+      ? `Kuyrukta ${outgoingFiles.length} dosya · Her dosya için alıcı onayı gerekir.`
+      : '';
+  }
+  async function pumpFiles() {
+    if (drainingFiles || transfer || !gate.approved || !token) return;
+    drainingFiles = true;
+    const owner = gate.connection,
+      currentToken = token;
+    try {
+      while (outgoingFiles.length && gate.connection === owner && !transfer) {
+        const meta = outgoingFiles.shift();
+        updateFileQueue();
+        if (api.openFile) await api.openFile(currentToken, meta.id);
+        if (gate.connection !== owner) return;
+        await transmitFile(meta, owner, currentToken);
+      }
+    } catch (err) {
+      if (gate.connection === owner) {
+        await cancelTransfer();
+        toast(errorText(err), true);
+      }
+    } finally {
+      drainingFiles = false;
+      if (outgoingFiles.length && !transfer && gate.approved)
+        queueMicrotask(() => pumpFiles().catch((err) => toast(errorText(err), true)));
     }
+  }
+  async function transmitFile(meta, owner, currentToken) {
     transfer = { ...meta, direction: 'out' };
     const task = transfer;
+    task.abort = new AbortController();
     transferUI('Dosya gönderiliyor', meta.name, 'Karşı tarafın onayı bekleniyor…');
     $('file-approval').hidden = true;
     try {
@@ -1785,6 +1926,14 @@
           transfer = null;
           return;
         }
+        // SCTP file traffic and video use separate peer connections. Bound file
+        // uploads so a large transfer cannot consume all of the video uplink.
+        await window.RKScreenTransfer.paceChunk(
+          Math.min(32768, meta.size - index * 32768),
+          fileBitrate,
+          task.abort.signal,
+        );
+        if (transfer !== task || gate.connection !== owner) return;
         const job = task.chunks
           .send({ type: 'file-chunk', id: meta.id, index, data: part.data })
           .then(
@@ -1853,6 +2002,7 @@
       send({ type: 'file-reply', id: m.id, status: 'saved' });
       transferUI('Dosya kaydedildi', result.name, 'İndirilenler klasöründe hazır.', 100);
       transfer = null;
+      pumpFiles().catch((err) => toast(errorText(err), true));
     }
   }
   async function acceptFile() {
@@ -1902,6 +2052,54 @@
     if (online) network('online', 'Bağlantıya hazır');
   });
   on('nav-home', 'click', () => showPage(false));
+  on('host-pause', 'click', async () => {
+    if (!token || gate.role !== 'host') return;
+    const paused = $('host-pause').getAttribute('aria-pressed') !== 'true';
+    await api.pauseControl(token, paused);
+    $('host-pause').setAttribute('aria-pressed', String(paused));
+    $('host-pause').textContent = paused ? 'Kontrolü sürdür' : 'Kontrolü duraklat';
+    toast(
+      paused
+        ? 'Uzak fare ve klavye duraklatıldı. İşaretçi açık kalır.'
+        : 'Uzak kontrol yeniden kullanılabilir.',
+    );
+  });
+  on('check-update', 'click', async () => {
+    if (!api?.checkUpdate) {
+      $('update-result').textContent = 'Güncelleme kontrolü uygulamada kullanılabilir.';
+      return;
+    }
+    $('check-update').disabled = true;
+    $('download-update').hidden = true;
+    $('update-result').textContent = 'GitHub’daki güncel yapı kontrol ediliyor…';
+    try {
+      const result = await api.checkUpdate();
+      $('update-result').textContent =
+        (result.available ? 'Yeni yapı var: ' : 'Yeni yapı bulunamadı. Yayındaki yapı: ') +
+        result.build +
+        (result.signed ? '' : ' · Setup imzasız; Windows engeli devam edebilir.');
+      $('download-update').hidden = !result.available;
+    } catch (err) {
+      $('update-result').textContent = 'Kontrol tamamlanamadı: ' + errorText(err);
+    } finally {
+      $('check-update').disabled = false;
+    }
+  });
+  on('download-update', 'click', () => api.openUpdate());
+  on('device-cancel', 'click', () => $('device-dialog').close());
+  $('device-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    write(
+      'menzil_recents',
+      window.RKScreenDevices.normalize(
+        recentItems().map((v) =>
+          v.id === editingDevice ? { ...v, alias: $('device-alias').value } : v,
+        ),
+      ),
+    );
+    $('device-dialog').close();
+    renderRecents();
+  });
   on('compatibility-mode', 'change', async () => {
     await api.compatibility($('compatibility-mode').checked);
     toast('Ayar kaydedildi. RK Screen’i kapatıp açınca uygulanır.');
@@ -2104,6 +2302,17 @@
   $('remote-video').addEventListener('resize', refreshVideoLayout);
   for (const id of ['host-chat', 'open-chat']) on(id, 'click', openChat);
   on('close-chat', 'click', () => ($('chat-panel').hidden = true));
+  on('chat-search', 'input', filterChat);
+  on('chat-export', 'click', async () => {
+    if (!api?.exportChat || !gate.approved) return;
+    const messages = [...$('chat-messages').querySelectorAll('.chat-bubble')].map((v) => ({
+      text: v.dataset.text,
+      mine: v.dataset.mine === 'true',
+      time: Number(v.dataset.time),
+    }));
+    if (!messages.length) return toast('Kaydedilecek mesaj yok.');
+    if (await api.exportChat(messages)) toast('Sohbet seçtiğiniz dosyaya kaydedildi.');
+  });
   $('chat-form').addEventListener('submit', (e) => {
     e.preventDefault();
     submitChat();
@@ -2131,8 +2340,9 @@
   });
   $('viewport').addEventListener('drop', (e) => {
     e.preventDefault();
-    const file = e.dataTransfer?.files[0];
-    if (file) sendFile(file).catch((err) => toast(errorText(err), true));
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (files.length)
+      sendFile(api.pickFiles ? files : files[0]).catch((err) => toast(errorText(err), true));
   });
   on('accept-file', 'click', acceptFile);
   on('reject-file', 'click', () => cancelTransfer(true));
@@ -2148,9 +2358,25 @@
     toast('Pano tercihi kaydedildi.');
   });
   on('clear-recents', 'click', () => {
-    write('menzil_recents', []);
+    write(
+      'menzil_recents',
+      recentItems().filter((v) => v.favorite),
+    );
     renderRecents();
     toast('Bağlantı geçmişi temizlendi.');
+  });
+  on('clear-devices', 'click', () => {
+    write('menzil_recents', []);
+    renderRecents();
+    toast('Favoriler ve kayıtlı cihazlar temizlendi.');
+  });
+  window.addEventListener('offline', () => {
+    message(window.RKScreenErrors.explain('offline'), true);
+    if (gate.approved) releaseInput();
+    else if (gate.connection) cleanup(window.RKScreenErrors.explain('offline'));
+  });
+  window.addEventListener('online', () => {
+    if (!gate.connection) initPeer();
   });
   window.addEventListener('beforeunload', () => {
     cleanup();

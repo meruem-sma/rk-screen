@@ -5,6 +5,10 @@ const invoke =
     ipcRenderer.invoke(channel, ...args);
 contextBridge.exposeInMainWorld('rkScreen', {
   info: invoke('app-info'),
+  checkUpdate: invoke('check-update'),
+  openUpdate: invoke('open-update'),
+  copyText: invoke('copy-text'),
+  exportChat: invoke('export-chat'),
   compatibility: invoke('compatibility'),
   saveDiagnostics: invoke('save-diagnostics'),
   connectionConfig: invoke('connection-config'),
@@ -16,6 +20,7 @@ contextBridge.exposeInMainWorld('rkScreen', {
   videoState: invoke('video-state'),
   videoReady: invoke('video-ready'),
   permissions: invoke('permissions'),
+  pauseControl: invoke('pause-control'),
   input: invoke('input'),
   inputKeepAlive: invoke('input-keepalive'),
   cursor: invoke('cursor'),
@@ -27,6 +32,13 @@ contextBridge.exposeInMainWorld('rkScreen', {
   copyId: invoke('copy-id'),
   fullscreen: invoke('fullscreen'),
   selectFile: invoke('file-select'),
+  pickFiles: (token, files) =>
+    ipcRenderer.invoke(
+      'file-pick',
+      token,
+      files ? Array.from(files).map((file) => webUtils.getPathForFile(file)) : null,
+    ),
+  openFile: invoke('file-open'),
   droppedFile: (token, file) =>
     ipcRenderer.invoke('file-select', token, webUtils.getPathForFile(file)),
   readFile: invoke('file-read'),

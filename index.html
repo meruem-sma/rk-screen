@@ -18,6 +18,8 @@
     <script src="src/core/network-check.js" defer></script>
     <script src="src/core/transfer.js" defer></script>
     <script src="src/core/pointer.js" defer></script>
+    <script src="src/core/errors.js" defer></script>
+    <script src="src/core/devices.js" defer></script>
     <script src="src/renderer.js" defer></script>
   </head>
   <body>
@@ -60,9 +62,13 @@
     <div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="#" aria-label="RK Screen ana ekran"
-          ><img class="brand-icon" src="assets/rk-screen-mark.png" alt="" width="32" height="32" /><span
-            >RK Screen<small>EKRAN PAYLAŞIMI</small></span
-          ></a
+          ><img
+            class="brand-icon"
+            src="assets/rk-screen-mark.png"
+            alt=""
+            width="32"
+            height="32"
+          /><span>RK Screen<small>EKRAN PAYLAŞIMI</small></span></a
         >
         <div class="nav-label">ÇALIŞMA ALANI</div>
         <button class="nav-item selected" id="nav-home">
@@ -73,7 +79,7 @@
         </button>
         <div class="sidebar-bottom">
           <div class="company">RK Softworks</div>
-          <span id="app-version">Beta 1 · 20261015.1</span
+          <span id="app-version">Beta 1 · 20261015.2</span
           ><button class="text-button" id="about-button">RK Screen hakkında <span>↗</span></button>
         </div>
       </aside>
@@ -103,7 +109,9 @@
             <label class="check"><input id="host-input" type="checkbox" />Uzaktan kontrol</label
             ><label class="check"><input id="host-clipboard" type="checkbox" />Metin panosu</label
             ><label class="check"
-              ><input id="host-pointer" type="checkbox" checked />İsimli işaretçi</label
+              ><input id="host-pointer" type="checkbox" checked />İkinci imleç</label
+            ><button class="button small" id="host-pause" aria-pressed="false">
+              Kontrolü duraklat</button
             ><button class="button small" id="host-screen">Ekran değiştir</button
             ><button class="button small" id="host-chat">Sohbet</button
             ><button class="button small" id="host-file">Dosya gönder</button
@@ -179,7 +187,7 @@
 
           <section class="recent-section">
             <div class="section-heading">
-              <h2>Son bağlantılar</h2>
+              <h2>Bilgisayarlarım</h2>
               <span>Bu cihazda saklanır</span>
             </div>
             <div id="recents"></div>
@@ -199,6 +207,18 @@
             </div>
           </div>
           <section class="panel settings-panel">
+            <h2>Güncelleme</h2>
+            <div class="setting-row">
+              <span
+                ><strong>Beta 1 güncelliği</strong
+                ><small
+                  >Aynı beta içindeki yeni yapıları kontrol eder. Kurulum kendiliğinden
+                  başlamaz.</small
+                ></span
+              ><button class="button small" id="check-update">Güncellemeyi kontrol et</button>
+            </div>
+            <p id="update-result" class="settings-note" role="status">Kontrol henüz yapılmadı.</p>
+            <button class="button small" id="download-update" hidden>Güncel setup’ı indir</button>
             <h2>Görüntü ve paylaşım</h2>
             <label class="setting-row" for="allow-requests"
               ><span
@@ -241,8 +261,17 @@
             <div class="setting-row">
               <span
                 ><strong>Bağlantı geçmişi</strong
-                ><small>Bu bilgisayarda saklanan son cihazları kaldırın.</small></span
+                ><small>Favoriler korunur; diğer son bağlantılar kaldırılır.</small></span
               ><button class="button small" id="clear-recents">Geçmişi temizle</button>
+            </div>
+            <div class="setting-row">
+              <span
+                ><strong>Tüm kayıtlı cihazları kaldır</strong
+                ><small
+                  >Favoriler ve yerel adlar da temizlenir. Karşı bilgisayardaki dosyalar
+                  etkilenmez.</small
+                ></span
+              ><button class="button small" id="clear-devices">Cihazları temizle</button>
             </div>
             <div class="setting-row">
               <span
@@ -301,8 +330,13 @@
     <section id="remote-session" class="remote-session" hidden>
       <header class="session-header">
         <div class="session-brand">
-          <img class="session-icon" src="assets/rk-screen-mark.png" alt="" width="24" height="24" />RK
-          Screen
+          <img
+            class="session-icon"
+            src="assets/rk-screen-mark.png"
+            alt=""
+            width="24"
+            height="24"
+          />RK Screen
         </div>
         <div class="session-title">
           <strong id="remote-name">Uzak bilgisayar</strong
@@ -321,6 +355,7 @@
           <label for="input-mode">Kontrol</label
           ><select id="input-mode">
             <option value="control">Fare ve klavye</option>
+            <option value="point">Yalnızca işaretle</option>
             <option value="view">Yalnızca izle</option></select
           ><span class="tool-divider"></span
           ><button class="tool-button" id="send-file">
@@ -386,10 +421,22 @@
           >Doğrulama kodu bekleniyor</output
         >
         <button class="text-button" id="report-session">Rapor kaydet</button>
-        <span>Yerel fare kullanıldığında öncelik karşı bilgisayardadır.</span
+        <span id="input-help">Ekran sahibi faresini kullanırken uzak fare ve klavye bekler.</span
         ><label class="check"><input id="session-clipboard" type="checkbox" />Metin panosu</label>
       </div>
     </section>
+    <dialog id="device-dialog">
+      <form id="device-form">
+        <h2>Bilgisayarı adlandır</h2>
+        <label for="device-alias">Bu cihazda gösterilecek ad</label
+        ><input id="device-alias" maxlength="48" autocomplete="off" />
+        <p class="muted">Bu etiket kimlik doğrulaması sağlamaz.</p>
+        <div class="dialog-actions">
+          <button class="button" id="device-cancel" type="button">Vazgeç</button
+          ><button class="button primary" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="incoming-dialog">
       <form method="dialog" id="incoming-form">
         <div class="dialog-symbol">
@@ -470,6 +517,15 @@
       <div id="chat-messages" class="chat-messages">
         <p class="empty-chat">Bu oturumun mesajları burada görünür.</p>
       </div>
+      <div class="chat-tools">
+        <input
+          id="chat-search"
+          type="search"
+          placeholder="Bu sohbette ara…"
+          aria-label="Sohbette ara"
+          maxlength="100"
+        /><button class="text-button" id="chat-export">Kaydet</button>
+      </div>
       <form id="chat-form">
         <textarea
           id="chat-input"
@@ -498,6 +554,7 @@
       <span id="transfer-name"></span
       ><progress id="transfer-progress" max="100" value="0"></progress>
       <p id="transfer-status"></p>
+      <p id="transfer-queue" class="muted" role="status"></p>
       <div id="file-approval" class="dialog-actions" hidden>
         <button class="button small" id="reject-file">Reddet</button
         ><button class="button primary small" id="accept-file">İndirilenler’e kaydet</button>

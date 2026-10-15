@@ -1,6 +1,6 @@
 # RK Screen — Beta 1
 
-Windows x64 için Türkçe ekran paylaşımı ve uzaktan destek. Güncel yapı **20261015.1**;
+Windows x64 için Türkçe ekran paylaşımı ve uzaktan destek. Güncel yapı **20261015.2**;
 tek yayın sürümü **1.0.0-beta.1**. MIT lisansıyla açık kaynak. Koyu arayüz ve RK monogramı.
 
 [Güncel durum ve açık işler](GUNCEL-DURUM.md) ·
@@ -9,13 +9,16 @@ tek yayın sürümü **1.0.0-beta.1**. MIT lisansıyla açık kaynak. Koyu aray�
 
 ## Kullanım
 
-1. İki bilgisayara da güncel Beta 1 setup'ını kurun. Eski Beta 1 yapılarıyla bağlantı kurulmayabilir; yapı numarası iki tarafta **20261015.1** olmalıdır.
+1. İki bilgisayara da güncel Beta 1 setup'ını kurun. Eski Beta 1 yapılarıyla bağlantı kurulmayabilir; yapı numarası iki tarafta **20261015.2** olmalıdır.
 2. Karşı bilgisayarın dokuz haneli kimliğini girin. Ekranını paylaşan kişi monitörü ve izinleri seçip isteği kabul eder. Kontrol, pano ve ses ayrı izinlerdir.
 3. Her iki taraftaki bağlantı doğrulama kodunu başka bir güvenilir iletişim yoluyla karşılaştırın. Kodlar farklıysa bağlantıyı bitirin. Görünen bilgisayar adı tek başına kimlik kanıtı değildir.
 4. Fare/klavye izni verildiyse araç çubuğunda **Fare ve klavye** seçip uzak ekrana tıklayın. **Yalnızca izle** modunda girdi gönderilmez.
 5. Başlangıç için **Otomatik**, küçük yazılar için **Net metin** kullanın. **1:1 piksel** fiziksel piksel gösterir; **Ekrana sığdır** en-boy oranını korur. Uzak Windows ekran çözünürlüğü değiştirilmez. FPS hedefi gerçek FPS garantisi değildir.
-6. Sohbette Enter gönderir, Shift+Enter satır açar. Teslim edilemeyen mesaj yeniden gönderilebilir. Dosyalar alıcının açık onayıyla İndirilenler'e kaydedilir.
+6. Sohbette Enter gönderir, Shift+Enter satır açar. Arama, mesaj kopyalama ve isteğe bağlı metin kaydı vardır. Teslim edilemeyen mesaj yeniden gönderilebilir. En fazla 20 dosya kuyruğa eklenir; her dosya alıcının ayrı onayıyla İndirilenler'e kaydedilir. Kopma/iptal kuyruğu temizler; aktarım kaldığı yerden devam etmez.
 7. Paylaşan kişi ekranı değiştirebilir, kontrol iznini kaldırabilir veya oturumu bitirebilir. Ayarlardan yeni bağlantı istekleri kapatılabilir.
+8. **Yalnızca işaretle** modunda fare/klavye gönderilmez; tıklama karşı ekranda geçici vurgu oluşturur. Ekran sahibi faresini kullanınca uzak fare ve klavye bekler. **Kontrolü duraklat** düğmesiyle bu bekleme elle sürdürülebilir.
+9. Son cihazları favoriye ekleyebilir, yerel ad verebilir veya silebilirsiniz. Favori olmak bağlantı onayını atlatmaz.
+10. Ayarlar'daki **Güncellemeyi kontrol et** aynı Beta 1 içindeki yeni yapıyı bildirir. İndirme kullanıcı isteğiyle açılır; uygulama kendiliğinden kurulmaz.
 
 ## Bağlantı ve kalite
 
@@ -71,4 +74,4 @@ Kullanıcının farklı internetlerde yaptığı kalite denemesi iyi değildi; y
 her NAT'ta erişim veya AnyDesk/TeamViewer düzeyi güvenilirlik iddiası yoktur.
 Kalıcı cihaz kimliği doğrulaması, bağımsız güvenlik denetimi, kesintiden devam eden dosya
 aktarımı, otomatik uygulama güncellemesi ve UAC yardımcı servisi tamamlanmış değildir.
-Gözetimsiz erişim yoktur. Önceki planlar tarihsel kayıttır; güncel liste [buradadır](GUNCEL-DURUM.md).
+Gözetimsiz erişim yoktur. Güncel işler ve test sınırları [buradadır](GUNCEL-DURUM.md).
