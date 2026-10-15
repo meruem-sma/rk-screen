@@ -21,4 +21,15 @@ test('default connection servers exclude retired relay credentials; custom relay
   ])
     assert.throws(() => validateRelay({ url, username: 'u', password: 'p' }));
   assert.throws(() => validateRelay({ url: 'turn:host:443', username: 'u', password: '' }));
+  assert.deepEqual(
+    validateRelay({
+      url: 'turn:relay.example.com:3478, turns:relay.example.com:443?transport=tcp',
+      username: 'u',
+      password: 'p',
+    }).urls,
+    ['turn:relay.example.com:3478', 'turns:relay.example.com:443?transport=tcp'],
+  );
+  assert.throws(() =>
+    validateRelay({ url: Array(5).fill('turn:host:443').join(','), username: 'u', password: 'p' }),
+  );
 });

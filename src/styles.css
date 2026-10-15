@@ -1259,14 +1259,42 @@ body {
 }
 
 .brand {
-  font-size: 25px;
+  font-size: 20px;
   letter-spacing: -0.6px;
+  gap: 8px;
+  white-space: nowrap;
 }
 .session-brand {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  object-fit: contain;
+}
+.session-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  object-fit: contain;
+}
+.verification-code {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4px;
+  overflow-wrap: anywhere;
+}
+.session-foot {
+  flex-wrap: wrap;
 }
 .chat-panel {
   width: min(380px, calc(100vw - 32px));

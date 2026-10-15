@@ -10,10 +10,15 @@ function validateRelay(value) {
   const url = value.url.trim(),
     username = value.username.trim();
   if (!url) return null;
+  const urls = url.split(/[,\n]+/).map((v) => v.trim());
   if (
-    !/^turns?:[a-z0-9.-]+:\d{1,5}(?:\?transport=(?:udp|tcp))?$/i.test(url) ||
-    Number(/:(\d+)(?:\?|$)/.exec(url)?.[1]) < 1 ||
-    Number(/:(\d+)(?:\?|$)/.exec(url)?.[1]) > 65535 ||
+    urls.length > 4 ||
+    urls.some(
+      (endpoint) =>
+        !/^turns?:[a-z0-9.-]+:\d{1,5}(?:\?transport=(?:udp|tcp))?$/i.test(endpoint) ||
+        Number(/:(\d+)(?:\?|$)/.exec(endpoint)?.[1]) < 1 ||
+        Number(/:(\d+)(?:\?|$)/.exec(endpoint)?.[1]) > 65535,
+    ) ||
     username.length < 1 ||
     username.length > 256 ||
     value.password.length < 1 ||
@@ -22,6 +27,6 @@ function validateRelay(value) {
     throw Error(
       'Sunucu adresini turn:adres:port veya turns:adres:port biçiminde, kullanıcı adı ve parolasıyla girin.',
     );
-  return { urls: [url], username, credential: value.password };
+  return { urls: [...new Set(urls)], username, credential: value.password };
 }
 module.exports = { directServers, validateRelay };

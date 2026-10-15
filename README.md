@@ -1,143 +1,74 @@
-# RK Screen 1.0.0-beta.2
+# RK Screen — Beta 1
 
-Windows 64 bit için Türkçe ekran paylaşımı ve uzaktan destek uygulaması. Electron, PeerJS, WebRTC ve Koffi kullanır. Koyu, sade arayüzde marka logosu bulunmaz.
+Windows x64 için Türkçe ekran paylaşımı ve uzaktan destek. Güncel yapı **20261015.1**;
+tek yayın sürümü **1.0.0-beta.1**. MIT lisansıyla açık kaynak. Koyu arayüz ve RK monogramı.
 
-Kaynak kodu MIT lisansıyla açıktır. [İndirme deposu](https://github.com/meruem-sma/rk-screen-downloads) ve [ürün sitesi](https://rkscreen.com.tr/) ayrı tutulur. Mevcut Beta 2 setup **imzasızdır** ve Windows tarafından engellenebilir. Açık kaynak geçişi dosyayı otomatik imzalamaz.
-
-Beta 2, bit hızının düşük değere takılmasını önleyen kalite değişiklikleri, ayrı hızlı fare kanalı, iki tarafın bağımsız görsel işaretçileri, kısa kesintiden devam etme ve yerel bağlantı raporu içerir. [Düzeltmeler, testler ve dış ağ sınırları](BETA2-IYILESTIRMELER.md).
-
-Beta 2 şu an geliştirme adayıdır: yerel Windows Uygulama Denetimi yeni setup'ı başlatmayı engelledi. Bu yüzden herkese açık indirme Beta 1'de tutulur; yeni aday için kurulum/açılış kabulü tamamlanmış değildir. Kaynak sürümü mevcut geliştirme ortamında test edilebilir.
-
-## Code signing policy
-
-[İmzalama politikası](CODE-SIGNING-POLICY.md), [gizlilik](PRIVACY.md), [güvenlik bildirimi](SECURITY.md) ve [SignPath başvuru hazırlığı](SIGNPATH-BASVURU.md). Ücretsiz imzalama için henüz kabul alınmadı.
+[Güncel durum ve açık işler](GUNCEL-DURUM.md) ·
+[Kurulum indirmesi](https://github.com/meruem-sma/rk-screen-downloads/releases/tag/v1.0.0-beta.1) ·
+[Site](https://rkscreen.com.tr/) · [Gizlilik](PRIVACY.md) · [Güvenlik bildirimi](SECURITY.md)
 
 ## Kullanım
 
-1. **İki bilgisayarda da 1.0.0-beta.2 sürümünü açın.** Protokol 8 kullanılır; Beta 1 ve önceki sürümlerle oturum kurulmaz.
-2. Karşı bilgisayarın dokuz haneli kimliğini girin. Ekranını paylaşan kişi isteği ve paylaşılacak ekranı onaylasın. Görünen cihaz adı karşı tarafın bildirdiği addır; doğrulanmış kimlik değildir.
-3. Fare/klavye, pano ve sistem sesi ayrı izinlerdir; başlangıçta kapalıdır.
-4. Kontrol izni verildiyse araç çubuğunda **Fare ve klavye** seçin ve uzak ekrana tıklayın. **Yalnızca izle** seçiliyken girdi gönderilmez. Üst durum yazısı etkin modu gösterir.
-5. Daha net yazılar için **Net metin**, ölçeği bozmamak için **Ekrana sığdır**, birebir fiziksel piksel görüntüsü için **1:1 piksel** seçin. Alanı doldurma görüntüyü kırpar; esnetmez. Uzak bilgisayarın Windows çözünürlüğü değiştirilmez.
-6. Görüntü takılırsa **Görüntüyü yenile** ile onaylanmış veri oturumunu kapatmadan video bağlantısını yeniden kurun.
-7. Sohbette Enter mesajı gönderir; Shift+Enter yeni satır açar. Teslim onayı gelmeyen mesaj yeniden gönderilebilir. Teslim onayı, karşı tarafın mesajı okuduğu anlamına gelmez.
-8. Paylaşan bilgisayarda **Ekran değiştir** ile başka monitörü önizleyip **Bu ekranı paylaş** seçin. Sohbet ve dosya aktarımı aynı oturumda devam eder.
-9. Her iki taraf bağlantıyı bitirebilir. Paylaşan taraf kontrol ve pano iznini sonradan kaldırabilir. Ayarlardan gelen yeni istekler kapatılabilir.
+1. İki bilgisayara da güncel Beta 1 setup'ını kurun. Eski Beta 1 yapılarıyla bağlantı kurulmayabilir; yapı numarası iki tarafta **20261015.1** olmalıdır.
+2. Karşı bilgisayarın dokuz haneli kimliğini girin. Ekranını paylaşan kişi monitörü ve izinleri seçip isteği kabul eder. Kontrol, pano ve ses ayrı izinlerdir.
+3. Her iki taraftaki bağlantı doğrulama kodunu başka bir güvenilir iletişim yoluyla karşılaştırın. Kodlar farklıysa bağlantıyı bitirin. Görünen bilgisayar adı tek başına kimlik kanıtı değildir.
+4. Fare/klavye izni verildiyse araç çubuğunda **Fare ve klavye** seçip uzak ekrana tıklayın. **Yalnızca izle** modunda girdi gönderilmez.
+5. Başlangıç için **Otomatik**, küçük yazılar için **Net metin** kullanın. **1:1 piksel** fiziksel piksel gösterir; **Ekrana sığdır** en-boy oranını korur. Uzak Windows ekran çözünürlüğü değiştirilmez. FPS hedefi gerçek FPS garantisi değildir.
+6. Sohbette Enter gönderir, Shift+Enter satır açar. Teslim edilemeyen mesaj yeniden gönderilebilir. Dosyalar alıcının açık onayıyla İndirilenler'e kaydedilir.
+7. Paylaşan kişi ekranı değiştirebilir, kontrol iznini kaldırabilir veya oturumu bitirebilir. Ayarlardan yeni bağlantı istekleri kapatılabilir.
 
-## Önceki sürümün (Beta 1) değişiklikleri
+## Bağlantı ve kalite
 
-- Görüntü bağlantısı kesildiğinde, veri oturumu açıksa kontrol güvenle bekletilir ve dört saniye sonra görüntü yeniden kurulur. Bir dakikada en fazla iki otomatik deneme yapılır. Yeni görüntü gelmeden kontrol açılmaz. Veri kanalı da kapanırsa yeniden onaylı bağlantı gerekir.
-- Ağ kapasitesi iki ardışık ölçümde düşükse bit hızı tavanı düşer; beş iyi ölçümden sonra %15 adımlarla yükselir. Chromium'un kendi ağ kontrolü çalışmaya devam eder.
-- Sürekli işlemci baskısında FPS hedefi 60→30→15 basamaklarıyla düşer; beş temiz ölçümden sonra kademeli yükselir. Statik ekranın düşük FPS'si tek başına arıza sayılmaz.
-- Gerçek FPS ve aktarım hızı, kaynak/iletilen çözünürlük, hedef FPS/bit hızı, doğrudan/aktarma rotası ve aralıklı paket kaybı ayrılır. Rota üzerine gelince medya gecikmesi görünür. Üstteki ping veri kanalının gidiş-dönüş süresidir.
-- Eksik sayaçlar ve akış değişimi yanlış hız üretmez; ölçüm işleri üst üste binmez. Desteklenmeyen kalite ayarları sessizce saklanmaz.
-- Beta sürüm adları ve önceki doğrulanmış dağıtımların temizliği desteklenir. rkscreen.com.tr sitesi ayrı bir web projesidir ve InfinityFree'de barındırılır.
+PeerJS Cloud sinyalleşmesi ve Google/Cloudflare STUN ile doğrudan bağlantı kullanılır.
+Çalışan varsayılan TURN yoktur. Bazı ağ çiftleri geçerli relay olmadan bağlanamaz.
+Ayarlardaki ağ testi ekran paylaşmadan bağlantı adaylarını kontrol eder; başka bir
+cihazla oturum kurulacağını kanıtlamaz. İsteğe bağlı TURN parolası Windows safeStorage
+ile şifrelenir; aynı kimlik bilgileriyle dört UDP/TCP/TLS adresi girilebilir.
 
-Çalışma sırası, kabul koşulları ve fiziksel saha matrisi: [OPTIMIZASYON-PLANI.md](OPTIMIZASYON-PLANI.md).
+Otomatik kalite zayıf bağlantıda önce kare hızını, daha sonra kontrollü ölçekte görüntü
+boyutunu azaltır. Profil tavanı düşük ağ tahminine tekrar tekrar kırpılmaz. Fare/imleç
+paketleri ayrı hızlı kanalda taşınır. Kısa görüntü kesintilerinde ilk yeni kareye kadar
+girdi bekletilir. Uzun kesintilerde sınırlı yeniden kurma vardır. Veri oturumu kapanırsa
+eski onayla yeni bağlantı açılmaz. Tuş/fare tutmaları karşı taraf etkinliği kesilince bırakılır.
 
-## 0.7.0 ile gelenler
+**Rapor kaydet**, son bağlantı/kalite ölçümlerini yerel JSON'a yazar. Ekran, sohbet,
+IP adresi, cihaz adı/kimliği, dosya içeriği ve parolalar rapora alınmaz. Otomatik gönderim yoktur.
 
-- **İsimli imleç:** İzleyen kişi, paylaşan bilgisayarın imlecini bilgisayar adıyla görür. Konum 50 ms aralıkla sorgulanır; değişmeyen konumlar süzülür.
-- **Karşı tarafın işaretçisi:** Paylaşan masaüstünde karşı bilgisayarın adı görünür. Enes, RK ekranına bağlandıysa RK masaüstünde “Enes” görünür. Yalnızca izleme modunda da kullanılabilir; kontrol izni vermez. Paylaşan kişi **İsimli işaretçi** kutusunu kapatabilir.
-- İşaretçi tıklamaları engellemez, odağı almaz; hareket kesilince 1,5 saniye sonra kaybolur. Windows'ta yakalamadan hariç tutulması istenir. Monitör geçişi/oturum sonunda kapatılır.
-- **Net metin** metin öncelikli kodlama ipucu kullanır. **Akıcı hareket** 60 FPS hedefi ve hareket önceliği ekler. Gerçek FPS üstte ölçülür; donanım/ağ koşulları hedefi sınırlayabilir.
-- Alt alanda kaynak ve iletilen çözünürlük, varsa işlemci/ağ sınırlaması gösterilir. Üstte alınan çözünürlük kalır.
-- Kalite değişiklikleri sırayla uygulanır; önceki video bağlantısına geç kalmış ayar gönderilmez.
+## Kurulum ve kaldırma
 
-Özellikler ve eksiklerin sırası [ANYDESK-KARSILASTIRMA.md](ANYDESK-KARSILASTIRMA.md) içindedir.
+Yayın setup EXE'dir; kullanıcı hesabına kurulur. Kaldırma Windows'un yüklü uygulamalar
+listesinden yapılır. Kullanıcı verileri ve alınan dosyalar sürüm temizliğinde silinmez.
+Yeni setup'ı kurmak eski uygulama dosyalarını yeniler; kurulu cihazlar kendiliğinden güncellenmez.
 
-## 0.6.0 ile gelenler
+Paket **imzasızdır**. Bakım sorumlusu bunu bilerek ücretsiz beta dağıtımına devam edilmesini
+istedi. Windows Akıllı Uygulama Denetimi dosyayı engelleyebilir. Setup biçimi bu güven
+kontrolünü kaldırmaz. Windows korumalarını kapatan, sertifika yükleyen veya engeli aşan
+bir kod eklenmez. Ücretli sertifika/hizmet ve başvuru zorunluluğu getirilmez.
 
-- Paylaşan kişi oturumdaki **Ekran değiştir** düğmesiyle bağlı monitörleri önizleyip yeni ekranı onaylayabilir. Uzak protokol başka monitör seçen bir komut sunmaz.
-- Yeni ekran yakalanamazsa mevcut paylaşım devam eder. Yakalama beklerken seçim iptal edilebilir. Bağlantı kesilirse sonradan açılan yakalama da kapatılır.
-- Geçişte basılı girdiler bırakılır; yeni görüntü ulaşana kadar Windows tarafında kontrol durdurulur. Eski görüntüye ait sonradan ulaşan girdiler reddedilir.
-- Video çağrısı, onaylı veri bağlantısına ve her görüntü yenilemede değişen rastgele anahtara bağlanır. Bu denetim cihaz kimliği doğrulaması değildir.
-- Paylaşım araçları sayfadan bağımsız üst alanda görünür; ayarlarda da paylaşım bitirilebilir.
-- Meşgul, istekleri kapalı, sürümü uyumsuz ve çok sık istek alan cihazlar için farklı açıklamalar gösterilir.
+## Geliştirme ve paketleme
 
-## 0.5.0 ile gelen temel
-
-- Ürün adı RK Screen oldu; eski marka görselleri kaldırıldı. Windows paketleri kurulum ve taşınabilir seçenekleriyle yeniden adlandırıldı.
-- 1:1 görüntü, Windows/DPI ölçeğini hesaba katıyor. Akış çözünürlüğü ve pencere boyutu değiştiğinde görüntü ve işaretçi yerleşimi güncelleniyor.
-- Sohbete teslim onayı, başarısız teslimi yeniden deneme, aynı mesajın tekrarını önleme, çok satırlı yazım, karakter sayacı ve okunmamış mesaj göstergesi eklendi. Eski mesajları okurken gelen mesajlar ekranı zorla aşağı kaydırmıyor.
-- Gelen istekleri kapatma ayarı ve cihaz başına/genel zaman pencereli istek sınırı eklendi. Bu yerel sınır, sunucu tarafı kötüye kullanım korumasının yerine geçmez.
-- Ekran/medya izni, onaylı paylaşan oturuma ve uygulamanın ana çerçevesine sınırlandı.
-- Yeni paket kontrol edilip hazırlandıktan sonra bu ürüne ait olduğu doğrulanan eski sürüm klasörleri otomatik kaldırılıyor. Sağlama toplamları ve sürüm kaydı oluşturuluyor.
-
-Önceki sürümdeki Windows SendInput, Türkçe karakter/kısayol desteği, basılı tuşları bırakma, yerel fare önceliği, görüntü yenileme ve açılış toparlanması korunur. Araştırma, kod değerlendirmesi ve sonraki aşamalar [RK-SCREEN-PLAN.md](RK-SCREEN-PLAN.md) içindedir.
-
-## Görüntü profilleri
-
-| Profil        | 1080p için üst sınır | Öncelik                                     |
-| ------------- | -------------------- | ------------------------------------------- |
-| Dengeli       | 12 Mbps / 30 FPS     | Metin netliği ve ağ kullanımı               |
-| Net metin     | 20 Mbps / 30 FPS     | Çözünürlük ve yazı okunabilirliği           |
-| Akıcı hareket | 24 Mbps / 60 FPS     | Hareket akıcılığı; çözünürlük azaltılabilir |
-| Düşük veri    | 2,5 Mbps / 24 FPS    | Daha az veri; görüntü küçültülebilir        |
-
-Daha büyük ekranlarda veri sınırı en fazla iki katına çıkar. Bunlar hedef sınırlarıdır; ağ, işlemci, kodlayıcı ve TURN kapasitesi gerçek sonucu belirler. Görüntü sıkıştırmalıdır; kayıpsız aktarım garantisi verilmez.
-
-## Windows sorun giderme
-
-- Kontrol çalışmıyorsa paylaşan bilgisayarın kontrol iznini, araç çubuğundaki modu ve uzak ekranın odağını kontrol edin.
-- Yönetici olarak çalışan uygulamalar ve UAC güvenli masaüstü Windows tarafından sınırlandırılır. Uygulama bu korumaları aşmaz.
-- Siyah ekran/açılış sorunu için Ayarlar → **Windows uyumluluk modu** seçeneğini açıp uygulamayı kapatıp açın. Donanım hızlandırması kapanır; performans düşebilir.
-- Grafik kaynaklı açılış sorunu için kurulu `RK Screen.exe --safe-mode` ile deneyin. Bu seçenek Windows'un imza engelini kaldırmaz.
-- Açılış ve işlem hataları kullanıcı veri klasöründeki `logs/startup.log` dosyasına yazılır. Ekran, pano, sohbet ve tuş içerikleri bu günlüğe yazılmaz.
-- Uygulamayı tekrar açmak mevcut pencereyi öne getirir.
-
-## Geliştirme, test ve sürüm hazırlama
-
-Node.js 22.12 veya üzeri ve Windows x64 gerekir.
+Windows x64, Node.js 22.12+:
 
 ```powershell
 npm ci
 npm start
-npm test
-npm run test:ui
-npm run test:e2e
-npm run test:startup
-npm run test:native
-npm run test:overlay
-npm run release
+npm run release:beta
 ```
 
-`release`, birim/arayüz/yerel bağlantı/açılış/işaretçi penceresi testlerini çalıştırır; ardından Windows kurulum paketini üretir, paket içeriğini kontrol eder, güvenilir imzalama kimliğiyle imzalar ve eski sürümleri temizler. Yeni sürüm hazırlanırken `package.json` sürümü, kilit dosyası ve çıktı klasörü birlikte güncellenmelidir. `npm run dist` yalnızca paketleme hattını çalıştırır; testleri ayrıca çalıştırmak gerekir.
+Son komut birim, arayüz, gerçek yerel WebRTC, açılış, işaretçi ve Windows yakalama
+testlerini çalıştırır; ardından imzasız setup üretip paket içeriğini kontrol eder.
+Çıktı `review/setup-candidate/1.0.0-beta.1/` içindedir. Doğrulanmış yayın kopyası
+`dist/1.0.0-beta.1/` altında saklanır. Kaynak derleme iş akışı aynı ücretsiz beta
+paketini GitHub artifact olarak üretir; otomatik herkese açık yayın yapmaz.
 
-Çıktılar `dist/1.0.0-beta.2/` içindedir: kurulum EXE, `SHA256SUMS.txt` ve `release.json`. Temizlik sadece bu ürüne ait olduğu doğrulanan daha eski dağıtım klasörlerine uygulanır; kaynak ve kullanıcı verilerine uygulanmaz. Bu işlem kullanıcının bilgisayarında kurulu uygulamayı uzaktan güncellemez. İmzalı otomatik güncelleme ayrı bir geliştirme aşamasıdır.
+İmzalı dağıtım için ayrı `npm run release` ve `npm run dist:setup` hattı korunur;
+gerçek imzalama kimliği olmadan bu hat durur. Beta hattı dosyayı imzalı göstermez.
 
-Bakım sorumlusunun 6 Ekim 2026 talebiyle Beta 1 imzasız setup olarak sunulur. `npm run dist:setup:beta` yalnızca beta sürümleri için ayrı `review/setup-candidate/<sürüm>/` klasörüne imzasız aday üretir ve paket içeriğini doğrular. Normal imzalı yayın hattı değişmez. Adayın kurulumu ve açılması denenmeden, GitHub dosyası/özeti doğrulanmadan mevcut indirme değiştirilmez. Setup da Windows tarafından engellenebilir; bu yol imza sorununu çözmüş sayılmaz.
+## Sınırlar
 
-`test:native` gerçek ekran yakalamayı açıp kapatır; görüntüyü dışarı göndermez. Fare/klavye testleri gerçek kullanıcı masaüstüne olay göndermez. `test:e2e` gerçek WebRTC, yapay ekran/pano ve gerçek dosya alıcı koduyla yerel iki oturumu sınar. `test:startup` izole bir test penceresinde arayüz çökmesi ve ikinci açılışı sınar. Sonuçlar [SISTEM-DENETIMI.md](SISTEM-DENETIMI.md) içindedir.
-
-## Dosya yapısı
-
-- `src/main.js`: pencere, Windows işlemleri, IPC yetkilendirmesi, dosyalar ve yaşam döngüsü.
-- `src/preload.js`: sınırlı masaüstü erişim köprüsü.
-- `src/renderer.js`: bağlantı, izinler, sohbet, medya ve aktarım akışları.
-- `src/core/session.js`: oturum sahipliği, istek sınırı ve ileti doğrulama.
-- `src/core/video.js`: kalite profilleri ve görüntü/işaretçi koordinatları.
-- `src/core/transport.js`: ağ ölçümleri, kalite uyarlaması ve toparlanma sınırı.
-- `src/core/file-store.js`: dosya parçaları, SHA-256 kontrolü, geçici dosya temizliği, mevcut dosyayı koruma.
-- `src/input/injector.js`, `src/input/packets.js`: Windows girdi erişimi, Unicode/tuş kodları ve girdi paketleri.
-- `src/peerjs.min.js`: paket bağımlılığıyla eşleşen yerel PeerJS dağıtımı.
-- `index.html`, `src/styles.css`: koyu arayüz ve yerleşim.
-- `tests/`, `scripts/`, `.github/`: doğrulama ve dağıtım araçları; uygulamaya paketlenmez.
-
-## Bağlantı, güvenlik ve sınırlar
-
-Bağlantı buluşması PeerJS Cloud; ağ geçişi Google/Cloudflare STUN ve OpenRelay TURN üzerinden yürür. Her ağda bağlantı garantisi yoktur. Üretim dağıtımından önce özel PeerServer/TURN, güvenli cihaz eşleştirme ve farklı internet bağlantılarında saha testi gerekir. WebRTC taşıma şifrelemesi, karşı tarafın kimliğinin bağımsız doğrulandığı anlamına gelmez. Görüntü anahtarı da kimlik doğrulamanın yerine geçmez. Tehdit modeli ve kalan işler [GUVENLIK-MODELI.md](GUVENLIK-MODELI.md) içindedir.
-
-Dosya sınırı 512 MB'dır. Alıcı onayı, 32 KB parçalar, SHA-256 kontrolü ve aynı adlı dosyayı koruma bulunur. Sohbet oturumla sınırlıdır; son 200 mesaj arayüzde tutulur. Sohbet ve paylaşılan pano içeriği kalıcı olarak kaydedilmez. Oturum öncesindeki pano metni otomatik gönderilmez.
-
-Gerçek iki fiziksel bilgisayarda klavye düzenleri, karma DPI/çoklu monitör, sistem sesi, yönetici uygulamaları ve farklı ağ türleri için kapsamlı test tamamlanmamıştır. Yerel testlerin geçmesi bu koşullar için garanti değildir.
-
-## İmzalama, yükseltme ve lisans
-
-Mevcut Beta 2 setup imzasızdır ve Windows Akıllı Uygulama Denetimi tarafından engellenebilir. Normal yayın derlemeleri imzalama kimliği yoksa durur; açıkça talep edilen imzasız beta adayı yukarıda açıklanan ayrı komutla oluşturulur. İç uygulama ve dış paket birlikte imzalanmalıdır. Sertifika kurulumu ve doğrulama adımları: [WINDOWS-IMZALAMA.md](WINDOWS-IMZALAMA.md).
-
-Eski kurulumu güncelleyebilmek için dahili uygulama kimliği `com.rksoftworks.menzil` korunmuştur. Paketli uygulama varsa eski Menzil kullanıcı veri klasörünü ve mevcut tercih anahtarlarını kullanır. Bunlar görünür ürün adı değildir. Gerçek kurulumdan yükseltme döngüsü temiz Windows makinesinde ayrıca doğrulanmalıdır.
-
-Kaynak kodu [MIT lisansıyla](LICENSE) yayımlanır. Üçüncü taraf bileşenlerin lisansları [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) içinde korunur. 6 Ekim 2026 setup güncel kaynaklardan, MIT lisansı ve bildirimler eklenerek yeniden üretildi. Henüz imzalı bir paket yayımlanmadı.
-
-RK Softworks · rksoftworks@gmail.com
+Kullanıcının farklı internetlerde yaptığı kalite denemesi iyi değildi; yeni yapı bu
+şikâyetleri hedefler fakat aynı fiziksel koşullarda tekrar test edilmelidir. Sabit 60 FPS,
+her NAT'ta erişim veya AnyDesk/TeamViewer düzeyi güvenilirlik iddiası yoktur.
+Kalıcı cihaz kimliği doğrulaması, bağımsız güvenlik denetimi, kesintiden devam eden dosya
+aktarımı, otomatik uygulama güncellemesi ve UAC yardımcı servisi tamamlanmış değildir.
+Gözetimsiz erişim yoktur. Önceki planlar tarihsel kayıttır; güncel liste [buradadır](GUNCEL-DURUM.md).

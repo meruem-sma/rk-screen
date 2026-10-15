@@ -2,7 +2,8 @@ const { contextBridge } = require('electron');
 let session = null;
 const state = { inputs: [], writes: [], readCount: 0, reports: [] };
 contextBridge.exposeInMainWorld('rkScreen', {
-  info: async () => ({ name: 'Çalışma bilgisayarı', version: '1.0.0-beta.2' }),
+  info: async () => ({ name: 'Çalışma bilgisayarı', version: '1.0.0-beta.1', build: '20261015.1' }),
+  connectionConfig: async () => ({ iceServers: [] }),
   saveDiagnostics: async (events) => {
     state.reports.push(events);
     return true;

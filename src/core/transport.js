@@ -64,6 +64,7 @@
       this.network = 0;
       this.networkGood = 0;
       this.networkLimited = false;
+      this.networkStage = 0;
       this.cpu = 0;
       this.cpuGood = 0;
     }
@@ -74,14 +75,21 @@
       // ratchet that suppresses probing. Leave bitrate control to WebRTC.
       if (sample.limitation === 'bandwidth') {
         this.networkGood = 0;
-        if (++this.network >= 5) this.networkLimited = true;
+        this.network++;
+        if (this.network >= 5) this.networkStage = Math.max(this.networkStage, 1);
+        if (this.network >= 10) this.networkStage = Math.max(this.networkStage, 2);
+        if (this.network >= 20) this.networkStage = Math.max(this.networkStage, 3);
       } else if (sample.limitation === 'none') {
         this.network = 0;
-        if (++this.networkGood >= 5) this.networkLimited = false;
+        if (++this.networkGood >= 5) {
+          this.networkStage = Math.max(0, this.networkStage - 1);
+          this.networkGood = 0;
+        }
       } else {
         this.network = 0;
         this.networkGood = 0;
       }
+      this.networkLimited = this.networkStage > 0;
       if (sample.limitation === 'cpu') {
         this.cpuGood = 0;
         if (++this.cpu >= 2) {
@@ -105,11 +113,15 @@
       return {
         ...profile,
         bitrate: profile.bitrate,
-        fps: Math.min(profile.fps, this.fps ?? profile.fps, this.networkLimited ? 30 : profile.fps),
+        fps: Math.min(
+          profile.fps,
+          this.fps ?? profile.fps,
+          [profile.fps, 30, 15, 8][this.networkStage],
+        ),
         ...(profile.maxScale
           ? {
               scale:
-                this.networkLimited && profile.allowScale
+                this.networkStage >= 2 && profile.allowScale
                   ? Math.min(1.5, profile.maxScale)
                   : profile.scale || 1,
             }

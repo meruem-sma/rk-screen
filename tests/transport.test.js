@@ -20,16 +20,40 @@ test('Transport estimates cannot ratchet the encoder ceiling down on a healthy o
   assert.equal(a.limits(profile).bitrate, profile.bitrate);
   for (let i = 0; i < 20; i++) a.update(profile, bad);
   assert.equal(a.limits(profile).bitrate, profile.bitrate);
-  assert.equal(a.limits(profile).fps, 30);
+  assert.equal(a.limits(profile).fps, 8);
   const good = { available: 750000, limitation: 'none' };
   for (let i = 0; i < 4; i++) a.update(profile, good);
-  assert.equal(a.limits(profile).fps, 30);
+  assert.equal(a.limits(profile).fps, 8);
   a.update(profile, good);
+  assert.equal(a.limits(profile).fps, 15);
+  for (let i = 0; i < 5; i++) a.update(profile, good);
+  assert.equal(a.limits(profile).fps, 30);
+  for (let i = 0; i < 5; i++) a.update(profile, good);
   assert.equal(a.limits(profile).fps, 60);
   for (const available of [null, undefined, NaN, -1, 0]) a.update(profile, { available });
   assert.equal(a.limits(profile).bitrate, profile.bitrate);
   a.reset();
   assert.deepEqual(a.limits(profile), profile);
+});
+test('Sustained weak links reduce frames before scaling; text mode keeps full resolution', () => {
+  const { qualitySettings } = require('../src/core/video');
+  const a = new AdaptiveQuality(),
+    auto = qualitySettings('auto', 1920, 1080);
+  for (let i = 0; i < 5; i++) a.update(auto, { limitation: 'bandwidth' });
+  assert.equal(a.limits(auto).fps, 30);
+  assert.equal(a.limits(auto).scale, 1);
+  for (let i = 0; i < 5; i++) a.update(auto, { limitation: 'bandwidth' });
+  assert.equal(a.limits(auto).fps, 15);
+  assert.equal(a.limits(auto).scale, 1.5);
+  assert.equal(a.limits(qualitySettings('detail')).scale, 1);
+  for (let i = 0; i < 10; i++) a.update(auto, { limitation: 'bandwidth' });
+  assert.equal(a.limits(auto).fps, 8);
+  for (let i = 0; i < 20; i++) a.update(auto, {});
+  assert.equal(a.limits(auto).fps, 8, 'missing stats cannot claim recovery');
+  for (let i = 0; i < 15; i++) a.update(auto, { limitation: 'none' });
+  assert.equal(a.limits(auto).fps, 60);
+  assert.equal(a.limits(auto).scale, 1);
+  assert.equal(a.limits(auto).bitrate, 16000000);
 });
 
 test('Real-time lane keeps PeerJS control channel, discards old motion and cannot inject reliable commands', () => {

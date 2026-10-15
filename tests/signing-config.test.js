@@ -14,12 +14,21 @@ test('unsigned setup requires a beta version and cannot replace the current rele
 });
 test('public build stops without a signing identity', () => {
   assert.throws(() => signingConfig({}), /Public release blocked/);
-  assert.throws(() => signingConfig({ RKSCREEN_SIGN_PASSWORD: 'test-only' }), /Public release blocked/);
+  assert.throws(
+    () => signingConfig({ RKSCREEN_SIGN_PASSWORD: 'test-only' }),
+    /Public release blocked/,
+  );
 });
 test('ambiguous or malformed signing identities are rejected', () => {
-  assert.throws(() => signingConfig({ CSC_LINK: 'a.pfx', RKSCREEN_SIGN_CERT: 'b.pfx' }), /Conflicting/);
+  assert.throws(
+    () => signingConfig({ CSC_LINK: 'a.pfx', RKSCREEN_SIGN_CERT: 'b.pfx' }),
+    /Conflicting/,
+  );
   assert.throws(() => signingConfig({ RKSCREEN_SIGN_THUMBPRINT: 'invalid' }), /40-character/);
-  assert.throws(() => signingConfig({ CSC_LINK: 'a.pfx', RKSCREEN_SIGN_THUMBPRINT: 'a'.repeat(40) }), /either/);
+  assert.throws(
+    () => signingConfig({ CSC_LINK: 'a.pfx', RKSCREEN_SIGN_THUMBPRINT: 'a'.repeat(40) }),
+    /either/,
+  );
 });
 test('certificate config reaches builder before payload signing', () => {
   const env = { RKSCREEN_SIGN_CERT: 'test-only.pfx', RKSCREEN_SIGN_PASSWORD: 'test-only' };
@@ -32,6 +41,9 @@ test('certificate config reaches builder before payload signing', () => {
 });
 test('hardware/store identity does not require exporting private keys', () => {
   const env = { RKSCREEN_SIGN_THUMBPRINT: 'a'.repeat(40) };
-  assert.equal(signingConfig(env).win.signtoolOptions.certificateSha1, env.RKSCREEN_SIGN_THUMBPRINT);
+  assert.equal(
+    signingConfig(env).win.signtoolOptions.certificateSha1,
+    env.RKSCREEN_SIGN_THUMBPRINT,
+  );
   assert.equal(env.CSC_LINK, undefined);
 });

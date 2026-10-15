@@ -100,7 +100,7 @@
       case 'pong':
         return Number.isFinite(m.time);
       case 'quality':
-        return ['balanced', 'detail', 'speed', 'fluid'].includes(m.value);
+        return ['auto', 'balanced', 'detail', 'speed', 'fluid'].includes(m.value);
       case 'permissions':
         return typeof m.input === 'boolean' && typeof m.clipboard === 'boolean';
       case 'release-input':

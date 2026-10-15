@@ -14,6 +14,10 @@
     <script src="src/core/video.js" defer></script>
     <script src="src/core/transport.js" defer></script>
     <script src="src/core/diagnostics.js" defer></script>
+    <script src="src/core/verification.js" defer></script>
+    <script src="src/core/network-check.js" defer></script>
+    <script src="src/core/transfer.js" defer></script>
+    <script src="src/core/pointer.js" defer></script>
     <script src="src/renderer.js" defer></script>
   </head>
   <body>
@@ -56,7 +60,9 @@
     <div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="#" aria-label="RK Screen ana ekran"
-          ><span>RK Screen<small>EKRAN PAYLAŞIMI</small></span></a
+          ><img class="brand-icon" src="assets/rk-screen-mark.png" alt="" width="32" height="32" /><span
+            >RK Screen<small>EKRAN PAYLAŞIMI</small></span
+          ></a
         >
         <div class="nav-label">ÇALIŞMA ALANI</div>
         <button class="nav-item selected" id="nav-home">
@@ -67,7 +73,7 @@
         </button>
         <div class="sidebar-bottom">
           <div class="company">RK Softworks</div>
-          <span id="app-version">Sürüm 1.0.0-beta.2</span
+          <span id="app-version">Beta 1 · 20261015.1</span
           ><button class="text-button" id="about-button">RK Screen hakkında <span>↗</span></button>
         </div>
       </aside>
@@ -86,6 +92,12 @@
           <div>
             <span class="live-dot"></span><strong id="host-label">Ekranınız paylaşılıyor</strong>
             <p id="host-detail"></p>
+            <output
+              id="host-code"
+              class="verification-code"
+              title="Karşı kişiyle aynı kodu gördüğünüzü doğrulayın."
+              >Doğrulama kodu bekleniyor</output
+            >
           </div>
           <div class="host-actions">
             <label class="check"><input id="host-input" type="checkbox" />Uzaktan kontrol</label
@@ -202,6 +214,7 @@
                 ><strong>Başlangıç görüntü kalitesi</strong
                 ><small>Ağ koşullarına göre gerçek kalite değişebilir.</small></span
               ><select id="default-quality">
+                <option value="auto">Otomatik · bağlantıya göre</option>
                 <option value="balanced">Dengeli · 30 FPS</option>
                 <option value="detail">Net metin · 30 FPS</option>
                 <option value="fluid">Akıcı hareket · 60 FPS</option>
@@ -241,6 +254,16 @@
               >
               <button class="button small" id="report-settings">Rapor kaydet</button>
             </div>
+            <div class="setting-row">
+              <span
+                ><strong>Ağ bağlantısını kontrol et</strong
+                ><small
+                  >Ekran paylaşmadan doğrudan ve aktarmalı bağlantı imkânını kontrol eder.</small
+                ></span
+              >
+              <button class="button small" id="network-check">Bağlantıyı test et</button>
+            </div>
+            <p id="network-check-result" class="settings-note" role="status"></p>
           </section>
           <p class="settings-note">
             Kimlik ve tercihler bu bilgisayarda tutulur. Bağlantı kurulurken PeerJS, STUN ve
@@ -263,7 +286,10 @@
             ><input id="relay-user" autocomplete="off" /> <label for="relay-password">Parola</label
             ><input id="relay-password" type="password" autocomplete="off" />
             <button class="button small" id="relay-save">Kaydet</button>
-            <p>Alanları temizleyerek yalnızca doğrudan bağlantıyı kullanabilirsiniz.</p>
+            <p>
+              UDP ve TCP/TLS adreslerini virgülle ayırarak en fazla dört sunucu adresi
+              yazabilirsiniz. Alanları temizleyerek yalnızca doğrudan bağlantıyı kullanabilirsiniz.
+            </p>
           </details>
         </main>
         <footer class="footer">
@@ -274,7 +300,10 @@
     </div>
     <section id="remote-session" class="remote-session" hidden>
       <header class="session-header">
-        <div class="session-brand">RK Screen</div>
+        <div class="session-brand">
+          <img class="session-icon" src="assets/rk-screen-mark.png" alt="" width="24" height="24" />RK
+          Screen
+        </div>
         <div class="session-title">
           <strong id="remote-name">Uzak bilgisayar</strong
           ><span id="session-state">Görüntü bekleniyor</span>
@@ -304,6 +333,7 @@
         </div>
         <div class="tool-group">
           <select id="quality" aria-label="Görüntü kalitesi">
+            <option value="auto">Otomatik</option>
             <option value="balanced">Dengeli</option>
             <option value="detail">Net metin</option>
             <option value="fluid">Akıcı hareket · 60 FPS</option>
@@ -349,6 +379,12 @@
       </div>
       <div class="session-foot">
         <span id="quality-status" role="status">Görüntü bilgisi bekleniyor</span>
+        <output
+          id="session-code"
+          class="verification-code"
+          title="Karşı kişiyle aynı kodu gördüğünüzü doğrulayın."
+          >Doğrulama kodu bekleniyor</output
+        >
         <button class="text-button" id="report-session">Rapor kaydet</button>
         <span>Yerel fare kullanıldığında öncelik karşı bilgisayardadır.</span
         ><label class="check"><input id="session-clipboard" type="checkbox" />Metin panosu</label>
@@ -414,10 +450,12 @@
         <li>İşiniz bittiğinde bağlantıyı sonlandırın.</li>
       </ol>
       <p class="muted">
-        Her iki cihazda RK Screen 0.7 sürümü gerekir. Önceki sürümlerle oturum kurulmaz. Görüntü
-        performansı donanıma ve ağa bağlıdır.
+        İki bilgisayara da güncel Beta 1 kurulumunu yükleyin. Eski Beta 1 yapılarıyla bağlantı
+        kurulmayabilir. Görüntü performansı donanıma ve ağa bağlıdır. Bağlantı sırasında iki
+        taraftaki doğrulama kodunu başka bir iletişim yoluyla karşılaştırın; kodlar farklıysa
+        oturumu bitirin.
       </p>
-      <div class="info-signature">RK Softworks <span>1.0.0-beta.2</span></div>
+      <div class="info-signature">RK Softworks <span>Beta 1 · 20261015.1</span></div>
     </dialog>
     <aside id="chat-panel" class="chat-panel" hidden>
       <div class="dialog-heading">

@@ -109,7 +109,7 @@ function createWindow() {
     minHeight: 640,
     title: 'RK Screen',
     backgroundColor: '#17191b',
-    icon: path.join(__dirname, '../assets/blank.ico'),
+    icon: path.join(__dirname, '../assets/rk-screen.ico'),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -163,6 +163,7 @@ function createWindow() {
 handle('app-info', () => ({
   name: require('node:os').hostname(),
   version: app.getVersion(),
+  build: require('../package.json').rkScreenBuild,
   compatibility,
 }));
 handle('compatibility', async (value) => {
@@ -178,12 +179,13 @@ handle('connection-settings', () => ({
 }));
 handle('connection-config', () => {
   const { directServers, validateRelay } = require('./core/ice');
-  if (!runtime.relay) return { iceServers: directServers };
+  const base = { bundlePolicy: 'max-bundle', iceCandidatePoolSize: 1 };
+  if (!runtime.relay) return { ...base, iceServers: directServers };
   const relay = validateRelay({
     ...runtime.relay,
     password: safeStorage.decryptString(Buffer.from(runtime.relay.encrypted, 'base64')),
   });
-  return { iceServers: [...directServers, relay] };
+  return { ...base, iceServers: [...directServers, relay] };
 });
 handle('save-connection-settings', async (value) => {
   if (session) throw Error('Sunucu ayarını değiştirmek için oturumu bitirin.');
@@ -201,7 +203,7 @@ handle('save-connection-settings', async (value) => {
     if (!safeStorage.isEncryptionAvailable())
       throw Error('Windows güvenli parola saklama hizmeti kullanılamıyor.');
     runtime.relay = {
-      url: relay.urls[0],
+      url: relay.urls.join(', '),
       username: relay.username,
       encrypted: safeStorage.encryptString(relay.credential).toString('base64'),
     };

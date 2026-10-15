@@ -166,6 +166,7 @@ app
     const html = (await fs.readFile(path.join(root, 'index.html'), 'utf8'))
       .replaceAll('src="src/', 'src="../src/')
       .replaceAll('href="src/', 'href="../src/')
+      .replaceAll('src="assets/', 'src="../assets/')
       .replace('https: wss:', `https: wss: ws://127.0.0.1:${port}`)
       .replace(
         '<script src="../src/renderer.js"',
@@ -242,6 +243,15 @@ app
         "document.getElementById('remote-video').videoWidth===640 && document.getElementById('remote-video').currentTime>0.2",
       );
       console.log('E2E video received: 640x360 over real WebRTC');
+      await wait(
+        controller,
+        "document.getElementById('session-code').textContent.startsWith('Kod: ')",
+      );
+      await wait(host, "document.getElementById('host-code').textContent.startsWith('Kod: ')");
+      assert.equal(
+        await run(controller, "document.getElementById('session-code').textContent"),
+        await run(host, "document.getElementById('host-code').textContent"),
+      );
       await wait(controller, "testLiveChannels[0]?.readyState==='open'");
       assert.deepEqual(
         await run(controller, '[testLiveChannels[0].ordered,testLiveChannels[0].maxRetransmits]'),

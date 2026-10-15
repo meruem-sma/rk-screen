@@ -10,6 +10,7 @@ app.whenReady().then(async () => {
     .replace('src/peerjs.min.js', 'tests/mock-peer.js')
     .replaceAll('src="src/', 'src="../src/')
     .replaceAll('href="src/', 'href="../src/')
+    .replaceAll('src="assets/', 'src="../assets/')
     .replace('src="tests/', 'src="../tests/');
   await fs.writeFile(path.join(root, 'review', 'ui-fixture.html'), html);
   const win = new BrowserWindow({
@@ -49,6 +50,12 @@ app.whenReady().then(async () => {
     assert.equal(await run('document.documentElement.scrollWidth > window.innerWidth'), false);
     await run("document.getElementById('nav-settings').click()");
     await wait("!document.getElementById('settings-page').hidden");
+    await run(
+      "window.RKScreenNetworkCheck.checkNetwork=async()=>({local:1,public:1,relay:0,errors:[],completed:true});document.getElementById('network-check').click();",
+    );
+    await wait(
+      "document.getElementById('network-check-result').textContent.includes('Aktarma sunucusu ayarlı değil')",
+    );
     await delay(150);
     await fs.writeFile(
       path.join(root, 'review', 'settings.png'),
@@ -200,7 +207,7 @@ app.whenReady().then(async () => {
       (await win.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG(),
     );
     assert.deepEqual(errors, []);
-    assert.equal(await run("document.querySelector('.brand-mark')===null"), true);
+    assert.equal(await run("document.querySelector('.brand-icon').naturalWidth>0"), true);
     assert.equal(
       await run("document.querySelector('.brand').textContent.includes('RK Screen')"),
       true,

@@ -8,7 +8,7 @@
     state: ['online', 'offline', 'waiting', 'unsupported'],
     route: ['direct', 'relay', 'unknown'],
     limitation: ['none', 'bandwidth', 'cpu', 'other', 'unknown'],
-    profile: ['balanced', 'detail', 'fluid', 'speed'],
+    profile: ['auto', 'balanced', 'detail', 'fluid', 'speed'],
   };
   const numbers = [
     'time',

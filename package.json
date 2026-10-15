@@ -1,6 +1,7 @@
 {
   "name": "rk-screen",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.1",
+  "rkScreenBuild": "20261015.1",
   "description": "RK Screen - Ekran Paylaşımı ve Uzaktan Destek",
   "main": "src/main.js",
   "author": {
@@ -13,7 +14,6 @@
     "test": "node --test tests/*.test.js",
     "test:ui": "electron tests/ui-smoke.cjs",
     "dist": "node scripts/build.cjs && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
-    "dist:portable": "node scripts/build.cjs portable && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
     "dist:setup": "node scripts/build.cjs nsis && node scripts/check-package.cjs && npm run sign && node scripts/finalize-release.cjs",
     "dist:setup:beta": "node scripts/build.cjs nsis --unsigned-beta && node scripts/check-package.cjs --unsigned-beta",
     "sign": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sign.ps1",
@@ -24,6 +24,7 @@
     "test:native": "electron tests/native-smoke.cjs",
     "release": "npm run check:signing && npm test && npm run test:ui && npm run test:e2e && npm run test:startup && npm run test:overlay && npm run test:native && npm run dist",
     "test:overlay": "electron tests/overlay-smoke.cjs",
+    "release:beta": "npm test && npm run test:ui && npm run test:e2e && npm run test:startup && npm run test:overlay && npm run test:native && npm run dist:setup:beta",
     "check:signing": "node scripts/signing-config.cjs",
     "licenses:refresh": "node scripts/third-party-notices.cjs"
   },
@@ -32,7 +33,7 @@
     "productName": "RK Screen",
     "copyright": "Copyright © 2026 RK Softworks. Tüm hakları saklıdır.",
     "directories": {
-      "output": "dist/1.0.0-beta.2"
+      "output": "dist/1.0.0-beta.1"
     },
     "win": {
       "target": [
@@ -43,7 +44,7 @@
           ]
         }
       ],
-      "icon": "assets/blank.ico",
+      "icon": "assets/rk-screen.ico",
       "legalTrademarks": "RK Softworks",
       "requestedExecutionLevel": "asInvoker",
       "signtoolOptions": {
@@ -69,7 +70,8 @@
       "index.html",
       "src/**/*.js",
       "src/**/*.css",
-      "assets/blank.ico",
+      "assets/rk-screen.ico",
+      "assets/rk-screen-mark.png",
       "src/cursor-overlay.html",
       "LICENSE",
       "THIRD-PARTY-NOTICES.txt",
@@ -94,5 +96,9 @@
   },
   "engines": {
     "node": ">=22.12.0"
+  },
+  "overrides": {
+    "http-cache-semantics": "4.3.0",
+    "global-agent": "4.1.3"
   }
 }

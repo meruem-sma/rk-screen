@@ -94,7 +94,7 @@
   };
   const savedPrefs = read('menzil_preferences_v3', null);
   const prefs = {
-    quality: Object.hasOwn(profiles, savedPrefs?.quality) ? savedPrefs.quality : 'balanced',
+    quality: Object.hasOwn(profiles, savedPrefs?.quality) ? savedPrefs.quality : 'auto',
     clipboard: savedPrefs?.clipboard === true,
     requests: savedPrefs?.requests !== false,
   };
@@ -203,7 +203,7 @@
       const text = document.createElement('div'),
         title = document.createElement('strong'),
         caption = document.createElement('small');
-      title.textContent = String(item.name || 'Uzak bilgisayar').slice(0, 80);
+      title.textContent = window.RKScreenPointer.cleanName(item.name);
       caption.textContent = formatted(item.id);
       text.append(title, caption);
       const button = document.createElement('button');
@@ -347,7 +347,7 @@
         if (conn.open) refuse();
         return;
       }
-      connectedName = String(conn.metadata.name || 'Uzak bilgisayar').slice(0, 80);
+      connectedName = window.RKScreenPointer.cleanName(conn.metadata.name);
       bindConnection(conn);
       refreshControls();
       armTimeout(45000, 'Bağlantı isteğinin süresi doldu.');
@@ -836,7 +836,7 @@
         return;
       gate.approve(conn);
       videoKey = m.videoKey;
-      connectedName = String(m.name || 'Uzak bilgisayar').slice(0, 80);
+      connectedName = window.RKScreenPointer.cleanName(m.name);
       $('cursor-name').textContent = connectedName;
       $('self-cursor-name').textContent = name;
       remoteInput = m.input;
@@ -1086,6 +1086,16 @@
     inputSequence = 0;
     lastPointerSent = 0;
     lastPong = Date.now();
+    const verificationOwner = gate.connection;
+    $('host-code').textContent = $('session-code').textContent = 'Doğrulama kodu bekleniyor';
+    window.RKScreenVerification.verificationCode(verificationOwner?.peerConnection)
+      .then((code) => {
+        if (gate.connection !== verificationOwner || !gate.approved) return;
+        $('host-code').textContent = $('session-code').textContent = code
+          ? 'Kod: ' + code
+          : 'Doğrulama kodu alınamadı';
+      })
+      .catch(() => {});
     adaptive.reset();
     recoveryBudget = new RecoveryBudget();
     qualityWarning = false;
@@ -1289,6 +1299,7 @@
       clearTimeout(w.timer);
       w.reject(new Error('Aktarım iptal edildi.'));
     }
+    transfer?.chunks?.cancel(new Error('Bağlantı sona erdi.'));
     transfer = null;
     $('transfer-panel').hidden = true;
     $('file-approval').hidden = true;
@@ -1336,6 +1347,7 @@
     pressedButtons.clear();
     remoteInput = false;
     remoteClipboard = false;
+    $('host-code').textContent = $('session-code').textContent = 'Doğrulama kodu bekleniyor';
     clipboardBaseline = null;
     refreshControls();
     message('Bağlantı, karşı tarafın onayıyla başlar.');
@@ -1638,12 +1650,35 @@
   function transferUI(title, filename, status, percent = 0) {
     $('transfer-panel').hidden = false;
     $('transfer-title').textContent = title;
-    $('transfer-name').textContent = filename;
+    $('transfer-name').textContent = String(filename).replace(
+      /[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g,
+      '_',
+    );
     $('transfer-status').textContent = status;
     $('transfer-progress').value = percent;
   }
+  function transferStatus(task, count) {
+    const now = performance.now();
+    task.startedAt ??= now;
+    const seconds = (now - task.startedAt) / 1000;
+    const rate = seconds >= 1 ? count / seconds : 0;
+    const remaining = rate > 0 ? Math.ceil(Math.max(0, task.size - count) / rate) : 0;
+    return (
+      bytes(count) +
+      ' / ' +
+      bytes(task.size) +
+      (rate ? ' · ' + bytes(rate) + '/sn' : '') +
+      (remaining > 0
+        ? ' · Yaklaşık ' + (remaining < 60 ? remaining + ' sn' : Math.ceil(remaining / 60) + ' dk')
+        : '')
+    );
+  }
   function receiveFileReply(m) {
     if (!transfer || m.id !== transfer.id) return;
+    if (m.status === 'chunk' && transfer.chunks) {
+      transfer.chunks.acknowledge(m.id, m.index);
+      return;
+    }
     if (['error', 'reject', 'cancel'].includes(m.status)) {
       if (fileWaiter) {
         const w = fileWaiter;
@@ -1688,6 +1723,7 @@
   async function cancelTransfer(notify = true) {
     const previous = transfer;
     transfer = null;
+    previous?.chunks?.cancel();
     clearTimeout(fileTimer);
     if (fileWaiter) {
       const w = fileWaiter;
@@ -1730,29 +1766,46 @@
     $('file-approval').hidden = true;
     try {
       await sendAndWait({ type: 'file-offer', ...meta }, 'accept');
+      task.startedAt = performance.now();
+      task.chunks = new window.RKScreenTransfer.ChunkWindow(meta.id, (m) => send(m));
+      const jobs = new Set();
+      let failure;
       let index = 0;
       while (transfer === task && gate.connection === owner) {
+        if (failure) throw failure;
         const part = await api.readFile(currentToken, meta.id);
         if (transfer !== task) return;
         if (part.done) {
+          await Promise.all(jobs);
+          if (failure) throw failure;
+          if (transfer !== task || gate.connection !== owner) return;
           await sendAndWait({ type: 'file-end', id: meta.id, hash: part.hash }, 'saved');
           if (transfer !== task) return;
           transferUI('Dosya gönderildi', meta.name, 'Karşı bilgisayara kaydedildi.', 100);
           transfer = null;
           return;
         }
-        await sendAndWait(
-          { type: 'file-chunk', id: meta.id, index, data: part.data },
-          'chunk',
-          index,
-        );
-        transferUI(
-          'Dosya gönderiliyor',
-          meta.name,
-          bytes(part.bytes) + ' / ' + bytes(meta.size),
-          meta.size ? (part.bytes / meta.size) * 100 : 100,
-        );
+        const job = task.chunks
+          .send({ type: 'file-chunk', id: meta.id, index, data: part.data })
+          .then(
+            () => {
+              if (transfer !== task) return;
+              task.confirmedBytes = Math.max(task.confirmedBytes || 0, part.bytes);
+              transferUI(
+                'Dosya gönderiliyor',
+                meta.name,
+                transferStatus(task, task.confirmedBytes),
+                meta.size ? (task.confirmedBytes / meta.size) * 100 : 100,
+              );
+            },
+            (err) => {
+              failure ??= err;
+            },
+          );
+        jobs.add(job);
+        job.then(() => jobs.delete(job));
         index++;
+        if (jobs.size >= 3) await Promise.race(jobs);
       }
     } catch (err) {
       if (transfer === task) {
@@ -1789,7 +1842,7 @@
       transferUI(
         'Dosya alınıyor',
         task.name,
-        bytes(count) + ' / ' + bytes(task.size),
+        transferStatus(task, count),
         task.size ? (count / task.size) * 100 : 100,
       );
       send({ type: 'file-reply', id: m.id, status: 'chunk', index: m.index });
@@ -1810,6 +1863,7 @@
       await api.beginFile(token, task);
       if (transfer !== task) return;
       task.accepted = true;
+      task.startedAt = performance.now();
       $('file-approval').hidden = true;
       clearTimeout(fileTimer);
       send({ type: 'file-reply', id: task.id, status: 'accept' });
@@ -1823,10 +1877,11 @@
   async function init() {
     if (api) {
       const info = await api.info();
-      name = info.name;
+      name = window.RKScreenPointer.cleanName(info.name);
       $('compatibility-mode').checked = info.compatibility === true;
       $('machine-name').textContent = name;
-      $('app-version').textContent = 'Sürüm ' + info.version;
+      $('app-version').textContent =
+        'Beta 1' + (info.build ? ' · ' + info.build : ' · ' + info.version);
     }
     deviceId = read('menzil_device_id_v3', '');
     if (!/^\d{9}$/.test(deviceId)) {
@@ -1863,6 +1918,39 @@
     on(id, 'click', async () => {
       if (await api?.saveDiagnostics(diagnostics.snapshot())) toast('Bağlantı raporu kaydedildi.');
     });
+  on('network-check', 'click', async () => {
+    if (!api || gate.connection) {
+      toast('Ağ testi için açık oturumu bitirin.');
+      return;
+    }
+    const button = $('network-check');
+    button.disabled = true;
+    $('network-check-result').textContent = 'Ağ bağlantısı kontrol ediliyor…';
+    try {
+      const config = await api.connectionConfig();
+      const result = await window.RKScreenNetworkCheck.checkNetwork(config);
+      const hasRelay = config.iceServers.some((s) =>
+        [].concat(s.urls).some((u) => /^turns?:/.test(u)),
+      );
+      $('network-check-result').textContent =
+        (result.public
+          ? 'İnternet bağlantı adayı bulundu. '
+          : 'Doğrudan internet bağlantısı bu testte doğrulanamadı. ') +
+        (result.relay
+          ? 'Aktarma bağlantı adayı bulundu. '
+          : hasRelay
+            ? 'Ayarlanan aktarma sunucusundan yanıt alınamadı. '
+            : 'Aktarma sunucusu ayarlı değil. ') +
+        'Bu kontrol karşı bilgisayarla bağlantı garantisi vermez.';
+      diagnostics.record('connection', {
+        state: result.public || result.relay ? 'online' : 'offline',
+      });
+    } catch (err) {
+      $('network-check-result').textContent = 'Test tamamlanamadı: ' + errorText(err);
+    } finally {
+      button.disabled = false;
+    }
+  });
   if (api?.connectionSettings)
     api
       .connectionSettings()

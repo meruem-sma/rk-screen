@@ -6,7 +6,7 @@ const MAX_FILE_SIZE = 512 * 1024 * 1024;
 function safeName(name) {
   let clean = path.win32
     .basename(String(name))
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, '_')
     .slice(0, 180)
     .replace(/[. ]+$/g, '');
   if (!clean || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(clean))

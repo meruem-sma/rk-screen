@@ -92,5 +92,6 @@ test('Windows filenames and relative paths are sanitized', () => {
   assert.equal(safeName('CON.txt'), 'dosya_CON.txt');
   assert.equal(safeName('x:secret.txt'), 'secret.txt');
   assert.equal(safeName('...'), 'dosya_adsiz');
+  assert.equal(safeName('photo\u202Egnp.exe'), 'photo_gnp.exe');
   assert.equal(safeName('a'.repeat(179) + ' .txt'), 'a'.repeat(179));
 });

@@ -4,6 +4,7 @@
   else root.RKScreenVideo = value;
 })(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   const profiles = {
+    auto: { bitrate: 16000000, fps: 60, hint: 'detail' },
     balanced: { bitrate: 12000000, fps: 30, hint: 'detail' },
     detail: { bitrate: 20000000, fps: 30, hint: 'text' },
     speed: { bitrate: 2500000, fps: 24, hint: 'motion' },
@@ -19,7 +20,7 @@
       // silently turn a 1080p desktop into unreadable 360p.
       degradation: 'maintain-resolution',
       maxScale: Math.max(1, Math.min(width, height) / 720),
-      allowScale: name === 'fluid' || name === 'speed',
+      allowScale: name === 'auto' || name === 'fluid' || name === 'speed',
       scale: name === 'speed' ? Math.min(1.5, Math.max(1, Math.min(width, height) / 720)) : 1,
     };
   }
