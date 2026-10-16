@@ -62,6 +62,8 @@ class CursorOverlay {
     if (!this.ready || !this.pending || this.win?.isDestroyed()) return;
     const { x, y, width, height } = this.pending;
     this.win.setBounds({ x, y, width, height }, false);
+    // Windows can clear topmost state while a transparent window is repositioned.
+    if (!this.win.isAlwaysOnTop()) this.win.setAlwaysOnTop(true, 'screen-saver');
     this.win.webContents.send('cursor-position', this.pending);
     if (!this.win.isVisible()) this.win.showInactive();
   }

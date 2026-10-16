@@ -10,7 +10,7 @@
   const pendingChats = new Map(),
     receivedChats = new Set();
   const gate = new SessionGate(),
-    PROTOCOL = 8;
+    PROTOCOL = 9;
   let liveLane = null,
     inputSequence = 0,
     lastPointerSent = 0;
@@ -35,6 +35,8 @@
     RetryBackoff,
   } = window.RKScreenTransport;
   const adaptive = new AdaptiveQuality();
+  const filePacer = new window.RKScreenTransfer.FilePacer();
+  let oldSendStats = null;
   const diagnostics = new window.RKScreenDiagnostics.Diagnostics();
   const signalingRetry = new RetryBackoff();
   let recoveryTimer = null,
@@ -84,8 +86,7 @@
     queuedFileMessages = 0,
     outgoingFiles = [],
     drainingFiles = false,
-    editingDevice = null,
-    fileBitrate = 1000000;
+    editingDevice = null;
   const read = (key, fallback) => {
     try {
       return JSON.parse(localStorage.getItem(key)) ?? fallback;
@@ -159,6 +160,7 @@
       if (inputTypes.has(data.type)) data = { ...data, videoKey };
       if (['mouse-move', 'mouse-button'].includes(data.type))
         data = { ...data, sequence: ++inputSequence };
+      if (conn === gate.connection && liveLane?.sendInput(data)) return true;
       if (
         conn === gate.connection &&
         ['mouse-move', 'cursor', 'pointer'].includes(data.type) &&
@@ -321,7 +323,7 @@
       return;
     }
     if (revision !== peerRevision) return;
-    peer = new Peer('rkscreen-v8-' + deviceId, { debug: 0, config });
+    peer = new Peer('rkscreen-v9-' + deviceId, { debug: 0, config });
     const ownerPeer = peer;
     reconnectSignaling(ownerPeer, true);
     peer.on('open', () => {
@@ -398,7 +400,7 @@
         if (gate.connection !== conn) return;
         $('incoming-name').textContent = connectedName + ' bağlanmak istiyor';
         $('incoming-id').textContent =
-          'Cihaz kimliği: ' + formatted(conn.peer.replace('rkscreen-v8-', ''));
+          'Cihaz kimliği: ' + formatted(conn.peer.replace('rkscreen-v9-', ''));
         $('allow-input').checked = false;
         $('allow-clipboard').checked = prefs.clipboard;
         $('allow-audio').checked = false;
@@ -473,7 +475,7 @@
           track.onended = () => {
             if (media === call) scheduleVideoRecovery(call);
           };
-        saveRecent(call.peer.replace('rkscreen-v8-', ''), connectedName);
+        saveRecent(call.peer.replace('rkscreen-v9-', ''), connectedName);
       });
     });
   }
@@ -584,7 +586,7 @@
     }
     await ending;
     if (gate.connection) return;
-    const conn = peer.connect('rkscreen-v8-' + id, {
+    const conn = peer.connect('rkscreen-v9-' + id, {
       reliable: true,
       metadata: { version: PROTOCOL, name },
     });
@@ -904,7 +906,14 @@
       refreshControls();
       return;
     }
-    if (!validMessage(m) || !token || !traffic.allow(m)) return;
+    if (!validMessage(m) || !token) return;
+    if (!traffic.allow(m)) {
+      if (m.type === 'file-chunk' && transfer) {
+        cancelTransfer(true);
+        toast('Dosya trafiği güvenli sınırı aştı. Aktarımı yeniden başlatın.', true);
+      }
+      return;
+    }
     if (inputTypes.has(m.type)) {
       if (gate.role === 'host') {
         try {
@@ -1027,6 +1036,8 @@
         break;
       case 'cursor':
         if (gate.role === 'controller' && m.videoKey === videoKey) {
+          if (m.control !== lastCursor?.control)
+            diagnostics.record('control', { control: m.control || 'none' });
           const paused = m.control === 'local' || m.control === 'manual';
           if (paused && !remotePaused) releaseInput(false);
           remotePaused = paused;
@@ -1055,7 +1066,7 @@
         if (m.type.startsWith('file-')) {
           if (m.type === 'file-reply') receiveFileReply(m);
           else {
-            if (queuedFileMessages >= 4) {
+            if (queuedFileMessages >= 10) {
               cleanup('Geçersiz dosya aktarım trafiği.');
               return;
             }
@@ -1144,6 +1155,8 @@
     recoveryBudget = new RecoveryBudget();
     qualityWarning = false;
     oldStats = null;
+    oldSendStats = null;
+    filePacer.reset(gate.role === 'host');
     clipboardBaseline = null;
     remotePaused = false;
     $('host-pause').setAttribute('aria-pressed', 'false');
@@ -1217,7 +1230,6 @@
           if (gate.connection !== owner || media !== currentMedia || videoKey !== currentKey)
             return;
           const route = selectedRoute(stats);
-          fileBitrate = Math.max(64000, Math.min(2000000, (route.available || 4000000) * 0.25));
           const routeLabel =
             route.route === 'relay'
               ? 'Aktarma sunucusu'
@@ -1230,6 +1242,18 @@
           let changed = false;
           stats.forEach((r) => {
             if (gate.role === 'host' && r.type === 'outbound-rtp' && r.kind === 'video') {
+              const elapsed = oldSendStats?.id === r.id ? r.timestamp - oldSendStats.timestamp : 0;
+              const videoBitrate =
+                elapsed > 0 && r.bytesSent >= oldSendStats.bytesSent
+                  ? ((r.bytesSent - oldSendStats.bytesSent) * 8000) / elapsed
+                  : null;
+              filePacer.updateMedia({
+                ...route,
+                videoBitrate,
+                limitation: r.qualityLimitationReason,
+                loss: window.RKScreenTransport.remoteLoss(stats.get(r.remoteId)),
+              });
+              oldSendStats = { id: r.id, timestamp: r.timestamp, bytesSent: r.bytesSent };
               const source = stream?.getVideoTracks()[0]?.getSettings() || {};
               const profile = qualitySettings(quality, source.width, source.height);
               changed =
@@ -1777,7 +1801,16 @@
   function receiveFileReply(m) {
     if (!transfer || m.id !== transfer.id) return;
     if (m.status === 'chunk' && transfer.chunks) {
-      transfer.chunks.acknowledge(m.id, m.index);
+      const elapsed = transfer.chunks.acknowledge(m.id, m.index);
+      if (elapsed !== undefined) filePacer.acknowledge(elapsed);
+      if (elapsed !== undefined && performance.now() - (transfer.lastDiagnostic || 0) >= 1000) {
+        transfer.lastDiagnostic = performance.now();
+        diagnostics.record('file', {
+          ackMs: elapsed,
+          fileBudget: filePacer.budget(),
+          buffered: gate.connection?.dataChannel?.bufferedAmount || 0,
+        });
+      }
       return;
     }
     if (['error', 'reject', 'cancel'].includes(m.status)) {
@@ -1929,8 +1962,8 @@
         // SCTP file traffic and video use separate peer connections. Bound file
         // uploads so a large transfer cannot consume all of the video uplink.
         await window.RKScreenTransfer.paceChunk(
-          Math.min(32768, meta.size - index * 32768),
-          fileBitrate,
+          part.data.length + 256, // Base64 + message overhead also consumes uplink.
+          filePacer.budget(),
           task.abort.signal,
         );
         if (transfer !== task || gate.connection !== owner) return;
@@ -1954,7 +1987,7 @@
         jobs.add(job);
         job.then(() => jobs.delete(job));
         index++;
-        if (jobs.size >= 3) await Promise.race(jobs);
+        if (jobs.size >= window.RKScreenTransfer.WINDOW_SIZE) await Promise.race(jobs);
       }
     } catch (err) {
       if (transfer === task) {

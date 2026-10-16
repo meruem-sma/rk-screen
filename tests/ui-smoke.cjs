@@ -208,7 +208,7 @@ app.whenReady().then(async () => {
     );
     await wait('window.testConnection?.open===true');
     await run(
-      "testConnection.emit('data',{type:'granted',version:8,videoKey:'11111111-1111-4111-8111-111111111111',name:'Tasarım bilgisayarı',input:true,clipboard:false});",
+      "testConnection.emit('data',{type:'granted',version:9,videoKey:'11111111-1111-4111-8111-111111111111',name:'Tasarım bilgisayarı',input:true,clipboard:false});",
     );
     await wait("!document.getElementById('remote-session').hidden");
     await run("document.getElementById('report-session').click();");
@@ -218,11 +218,11 @@ app.whenReady().then(async () => {
     );
     assert.equal(await run("testConnection.sent.some(m=>m.type==='ready')"), true);
     await run(
-      "window.wrongCall=new Call(testConnection.peer);wrongCall.metadata={version:8,videoKey:'22222222-2222-4222-8222-222222222222'};testPeer.emit('call',wrongCall);",
+      "window.wrongCall=new Call(testConnection.peer);wrongCall.metadata={version:9,videoKey:'22222222-2222-4222-8222-222222222222'};testPeer.emit('call',wrongCall);",
     );
     assert.equal(await run('wrongCall.closed'), true);
     await run(
-      "window.foreignCall=new Call('other-device');foreignCall.metadata={version:8,videoKey:'11111111-1111-4111-8111-111111111111'};testPeer.emit('call',foreignCall);",
+      "window.foreignCall=new Call('other-device');foreignCall.metadata={version:9,videoKey:'11111111-1111-4111-8111-111111111111'};testPeer.emit('call',foreignCall);",
     );
     assert.equal(await run('foreignCall.closed'), true);
     await delay(150);
@@ -282,10 +282,10 @@ app.whenReady().then(async () => {
     assert.equal(await run("JSON.parse(localStorage.getItem('menzil_recents')).length"), 1);
     await run("localStorage.setItem('test-product-version','1.0.0');");
     await win.loadFile(path.join(root, 'review', 'ui-fixture.html'));
-    await wait("document.getElementById('app-version').textContent==='Sürüm 1.0.0 · 20261015.3'");
+    await wait("document.getElementById('app-version').textContent==='Sürüm 1.0.0 · 20261016.1'");
     assert.equal(
       await run("document.getElementById('about-version').textContent"),
-      'Sürüm 1.0.0 · 20261015.3',
+      'Sürüm 1.0.0 · 20261016.1',
     );
     await run("localStorage.removeItem('test-product-version');");
     // Valid JSON can still have the wrong shape or name an inherited object property.

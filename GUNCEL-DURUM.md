@@ -1,162 +1,89 @@
 # RK Screen — Beta 1
 
-15 Ekim 2026. Tek yayın sürümü `1.0.0-beta.1`; yeni MVP yapısı `20261015.3`.
-Beta 2 adıyla hazırlanan geliştirmeler bu Beta 1 güncellemesine alındı. Eski sürüm
-notları kaldırıldı; güncel yayın durumu ve açık işler bu belgede tutulur.
+16 Ekim 2026 · 1.0.0-beta.1 · yapı 20261016.1 · Windows x64 setup.
 
-## 1.0 yayın değerlendirmesi — 15 Ekim 2026
+## Bu güncellemenin nedeni
 
-**Karar: henüz kararlı 1.0 yayımlamaya hazır değil.** Yeni özelliklerin çoğu var;
-ancak gerçek ağ/kurulum kabulünün eksik olması, bütün sistemin düzgün çalıştığı
-sonucuna izin vermez. Beta etiketi bu kontroller bitmeden kaldırılmaz.
+Kullanıcının 16 Ekim görüntülerinde doğrudan bağlantı 17 ms, kayıp %0 ve görüntü
+1080p / 30–44 FPS iken 2 MB dosya yaklaşık 9 KB/sn ilerliyor; sonra parça zaman aşımı
+veriyor. Kontrol bazı anlarda ekran sahibinin faresi etkin sanılarak bekliyor.
+Bunlar saha bulgusudur; fotoğraftaki 17 ms bütün internetlerin gecikmesi değildir.
 
-| Konu | Durum ve 1.0 için gereken |
-| --- | --- |
-| Kaynak ve testler | Yeni incelemede iki hata yeniden üretildi ve düzeltildi: hareket trafiğinin klavyeyi/tuş bırakmayı engellemesi ve iptal edilmiş dosya onayının geç hatasının yeni aktarımı kapatması. Regresyon testleri eklendi. |
-| Sürüm bilgisi | Hakkında ekranındaki eski yapı ve sabit Beta 1 etiketleri düzeltildi. Arayüz gerçek paket sürümünden beta/kararlı adını üretir; bu hazırlık tek başına 1.0 yayını değildir. |
-| Farklı internetler | Çalışan varsayılan TURN yok. Genel internetten erişim hedefi için gerçek aktarma yolu doğrulanmalı veya ürün kapsamı doğrudan bağlantı kurabilen ağlarla açıkça sınırlanmalı. |
-| Gerçek kalite | Son yapıyla iki fiziksel cihazda farklı internetlerde ölçüm eksik. Kullanıcının eski yapıdaki düşük kalite şikâyetinin giderildiği henüz kanıtlanmadı. |
-| Kurulum/yaşam döngüsü | Ayrı temiz Windows 10/11, önceki kurulum üzerine yükseltme ve kaldırma doğrulanmadı. Yayın kaydındaki installVerified değeri false. Uyku/uyanma ve ağ değişimi de sınanmalı. |
-| Güvenlik | Mevcut izin/sandbox/mesaj sınırları test ediliyor. Doğrulama kodu veri bağlantısının sertifikalarına dayanır; ayrı medya bağlantısının sertifikaları bu koda dahil değildir. Kalıcı cihaz kimliği veya bağımsız güvenlik denetimi tamamlandı denemez. |
-| Windows dağıtımı | Setup imzasız. Mevcut normal derleme hattı imza ister; açık imzasız dağıtım istisnası beta ile sınırlıdır. Bu bir proje yayın politikasıdır; Windows'un her imzasız 1.0 paketini teknik olarak yasakladığı anlamına gelmez. Ücretli hizmete/hesaba başvurulmadı. |
-| Canlı site | 15 Ekim tarayıcı kontrolünde HTTPS sayfası gizlilik uyarısı olmadan açıldı, CSS ve logo yüklendi. İndirme düğmesi GitHub'daki geçerli setup'a yönlendi. Canlı tanıtım metinleri eski; güncel ZIP hosting'e ayrıca yüklenmeli. Komut satırı isteğinin başarısız olması sitenin tarayıcıda kapalı olduğu anlamına gelmedi. |
+## Uygulanan düzeltmeler
 
-**1.0 için şart olmayan ek özellikler:** serbest çizim, kesilen dosyaya devam,
-gözetimsiz erişim ve otomatik kurulum sonraya bırakılabilir. Öncelik mevcut temel
-bağlantı, ekran, girdi, dosya ve kurulum akışının doğrulanmasıdır.
+- Dosya yüklemesi, izlenen videonun ters yöndeki RTP tahminiyle kısıtlanmaz.
+  Alındı onaylarının gecikmesine göre 4 Mbit/sn başlangıç bütçesi artırılır/azaltılır;
+  üst bütçe 16 Mbit/sn, alt sınır 64 kbit/sn. Bu değerler gerçek hız garantisi değildir.
+  Base64 ve mesaj ek yükü de gönderim bütçesine dahildir.
+- Ekranı paylaşan bilgisayarda, güncel gönderilen video hızı hesaba katılarak görüntüye
+  kapasite ayrılır. Eski medya tahmini 6 saniye sonra geçersiz olur.
+- En fazla sekiz adet 32 KiB parça aynı anda bekler: ham içerik penceresi 256 KiB.
+  Alıcının işlem kuyruğu da sınırlıdır. Geçerli onay geldikçe bekleme süresi yenilenir;
+  hiç ilerleme yoksa 45 saniyede bütün bekleyen işler kapatılır. Otomatik tekrar
+  gönderme/kesintiden devam yoktur. Alıcı onayı, SHA-256 ve dosya ezmeme korunur.
+- Hızlı dosya parçası ve onay trafiği ayrı sınıra alınır. Sınır aşımı artık güvenilir
+  parçayı sessizce düşürüp zaman aşımı bekletmez; aktarım açıkça durdurulur.
+- Klavye, tıklama, tekerlek, girdi bırakma ve bağlantı yoklaması için dosya kanalından
+  ayrı, sıralı ve güvenilir veri kanalı vardır. Hareket/işaretçi kanalı ayrı kalır.
+  Her iki yol da aynı oturum, izin, biçim ve hız kontrollerinden geçer.
+- Windows imleç gözlemi ve girdi sonrası gözlem aynı yerel koordinat okuyucusunu
+  kullanır. Electron DIP dönüşümüyle Windows konumunun karışmasının uygulamanın
+  kendi hareketini yerel kullanıcı hareketi sayması testte üretildi ve düzeltildi.
+  Gerçek yerel fare önceliği ve elle duraklatma korunur.
+- Yerel imleç bileşeni yüklenemezse yalnızca izleme paylaşımı da bozulmaz; bu,
+  Windows'un engellediği DLL'yi çalıştırmaz veya uzaktan kontrol engelini aşmaz.
+- Windows'ta işaretçi penceresi taşınırken üstte kalma durumu kaybolursa tekrar
+  uygulanır. Tıklamaları geçirme, odak almama ve yakalama koruması korunur.
+- Raporda dosya bütçesi, parça onay süresi, bekleyen veri miktarı ve kontrolün
+  bekleme nedeni bulunur. Rapor IP, parola, cihaz adı/kimliği, dosya adı/içeriği,
+  ekran veya sohbet içermez; yalnızca kullanıcı kaydettiğinde yerel dosyaya yazılır.
+- Bağlantı biçimi v9 oldu. İki bilgisayarda da bu yapı kurulmalıdır; eski yapıyla
+  karışık kullanım desteklenmez. Uygulama sürüm adı yine yalnızca Beta 1'dir.
 
-**Şimdi yapılmaması gerekenler:** sadece sürüm numarasını değiştirip kararlı ilan
-etmek; test geçişini tüm internetlerde çalışma garantisi saymak; yeni paket
-kontrol edilmeden eskisini silmek; canlı site kabulü olmadan yayını tamamlandı
-saymak. Kullanıcı ayarları ve alınmış dosyalar sürüm temizliğiyle silinmez.
+## Doğrulama kapsamı
 
-## Tamamlanan işler
+61 birim testi; Windows arayüzü, yerel gerçek PeerJS/WebRTC, iki imleç, kesinti,
+Türkçe klavye, denetim izni, ekran değişimi, sohbet, çoklu dosya ve açılış testleri.
+Windows ana süreç testi gerçek ekran yakalar, fakat kullanıcının faresine/klavyesine
+basmaz. Tutarsız iki konum okuyucusu test ortamında bilerek oluşturulur.
+WebRTC dosya denemesi 2 MB'tan büyük rastgele veri, SHA-256 ve iki yönde aktarım içerir.
+Bu, gerçek iki uzak bilgisayarda performans ölçümü değildir.
+16 Ekim npm resmî bağımlılık taramasında bildirilen açık sayısı 0; bu bağımsız
+güvenlik denetimi veya sıfır risk garantisi değildir.
 
-- Windows x64 için kullanıcı hesabına kurulan, Windows Ayarlar'dan kaldırılabilen NSIS setup.
-- RK monogramı; uygulama penceresi, kurulum, kısayol ve site için ortak PNG/ICO.
-- Otomatik kalite: 60 FPS üst hedefi; uzun bant genişliği kısıtında önce 30, sonra 15,
-  ardından 8 FPS hedefi. İlk kademede tam boyut korunur; sonraki kademelerde izin verilen
-  profillerde 1080p kaynak en çok 720p'ye ölçeklenir. Net metin profili tam boyutu korur.
-  Beş iyi ölçümle tek kademe toparlanır. WebRTC'nin gerçek bit hızı denetimi korunur;
-  düşük kapasite tahmini tekrar tekrar bitrate tavanına çevrilmez.
-- Ayrı hızlı fare/imleç kanalı, iki isimli görsel işaretçi ve hareketsiz işaretçinin görünürlüğü.
-- AltGr/Türkçe Unicode, kesintide basılı tuş/fare bırakma ve kontrollü medya toparlanması.
-- Oturumun iki DTLS sertifika parmak izinden türetilen ortak doğrulama kodu. Kod iki tarafta
-  başka bir güvenilir iletişim yoluyla karşılaştırılmalıdır. Cihaz adı doğrulanmış kimlik değildir;
-  kodu yalnızca ekranda göstermek otomatik kimlik doğrulaması sayılmaz.
-- Ekran paylaşmadan ağ testi: yerel, STUN ve varsa TURN adayları; IP/parola içermeyen rapor.
-- Yapılandırılmış TURN için aynı kimlik bilgileriyle en çok dört UDP/TCP/TLS uç noktası.
-- Dosya aktarımında ortalama hız ve yaklaşık kalan süre; alıcı onayı ve SHA-256 korunur.
-- Her dosya parçasında tam ağ turunu tek tek beklemek yerine en fazla üç adet 32 KiB parça
-  birlikte gönderilir. Gönderici belleği ve alıcı iş kuyruğu sınırlıdır; alındı onayları
-  bitmeden dosya sonu gönderilmez. İptal/kopma bekleyen parçaları kapatır.
-- Dosya adlarında yön gizleyen Unicode/kontrol karakterleri güvenli adlara dönüştürülür.
-- Derleme zincirindeki `http-cache-semantics` ve `global-agent` alt bağımlılıkları, API
-  uyumluluğu kontrol edilerek sabitlendi. 15 Ekim npm taraması: tüm bağımlılıklarda
-  bildirilen açık sayısı 0. Bu, bağımsız güvenlik denetimi veya sıfır risk garantisi değildir.
+## 1.0 öncesinde hâlâ gerekenler
 
-## Ücretsiz dağıtım kararı
+- Çalışan varsayılan TURN yok. Doğrudan bağlantı kurulamayan ağ çiftleri için
+  geçerli aktarma altyapısı gerekir. InfinityFree/GitHub statik barındırma TURN değildir.
+  Hesap/başvuru/ücretli hizmet alınmadı; çalışmayan genel relay bilgileri pakete eklenmez.
+- Bu yeni yapıyla iki fiziksel bilgisayarda, farklı internetlerde tekrar test:
+  Otomatik ve Net metin; küçük yazı, kaydırma, hareketli içerik ve eş zamanlı dosya.
+  Gerçek FPS, gecikme, kayıp, donma ve dosya hızını iki taraftaki raporlarla karşılaştırın.
+- Karma DPI/çoklu monitör, Türkçe Q/F, gerçek yerel fare devralma, uyku/uyanma ve ağ değişimi.
+- Ayrı temiz Windows 10/11 kurulum, eski kurulum üzerine yükseltme ve kaldırma.
+  installVerified hâlâ false. Kaynak testi bu kabulün yerine geçmez.
+- Kurulum imzasız. Windows Akıllı Uygulama Denetimi engeli çözülmüş değildir.
+  Setup'a çevirmek yayıncı imzası sağlamaz. Koruma kapatma veya sahte imza eklenmez.
+- Kalıcı doğrulanmış cihaz kimliği ve bağımsız güvenlik denetimi tamamlanmadı.
+  Elle karşılaştırılan oturum kodu veri bağlantısına dayanır; ayrı medya sertifikaları
+  bu koda dahil değildir. Cihaz adı tek başına kimlik kanıtı değildir.
 
-Bakım sorumlusu, imzasız setup'ın Windows tarafından engellenebileceğini bilerek 15 Ekim'de
-bu yolla yayına devam edilmesini istedi. Sertifika/ücretli hizmet/başvuru satın alınmaz;
-Windows korumaları değiştirilmez. Paket imzalıymış gibi gösterilmez. Kaynak/test/paket ve
-GitHub boyut/SHA-256 eşleşmesi doğrulandıktan sonra aynı Beta 1 indirmesi yenilenir.
-Kurulu uygulamalar kendiliğinden güncellenmez; iki cihaz da yeni setup'ı kurmalıdır.
+Karar: kararlı 1.0 ilan edilmez. Sabit 60 FPS, bütün cihazlar/ağlarda çalışma ve
+AnyDesk/TeamViewer düzeyi güvenilirlik sözü verilmez. Serbest çizim, kesilen dosyaya
+devam ve otomatik kurulum mevcut temel işlevler doğrulanana kadar sonraya kalabilir.
 
-## Açık teknik sınırlar
+## Yayın ve temizlik
 
-- **Çalışan ücretsiz TURN doğrulanamadı.** 15 Ekim'de resmî OpenRelay static-auth ve
-  freeSTUN genel kimlik bilgileriyle relay-only veri yankı testi denendi: ikisinde de
-  relay adayı ve veri yankısı yoktu. Eski/çalışmayan genel bilgiler pakete eklenmez.
-  Doğrudan bağlantının mümkün olmadığı ağ çiftleri için geçerli bir aktarma hizmeti hâlâ gerekir.
-  InfinityFree statik site/GitHub indirme barındırması bu hizmetin yerini almaz.
-- Kullanıcının farklı internetlerde yaptığı saha testinde kalite kötüydü. Yeni değişiklikler
-  bu şikâyeti hedefler; iki gerçek bilgisayarda yeni yapıyla tekrar ölçülmeden giderildiği söylenmez.
-- Sabit 60 FPS, her bağlantıda tam netlik ve kesintisizlik garanti edilmez.
-- Bağımsız güvenlik denetimi, özel sinyal altyapısı, kalıcı doğrulanmış cihaz eşleştirmesi,
-  dosya aktarımında kesintiden devam, uygulama içi otomatik güncelleme ve UAC yardımcı
-  servisi tamamlanmış değildir. Onaysız/gözetimsiz erişim yoktur.
+Yeni aday bütün kaynak/paket kontrollerinden geçmeden mevcut indirme silinmez.
+Doğrulanan setup aynı v1.0.0-beta.1 yayınına, yeni yapı ve SHA-256 ile alınır.
+GitHub dosyası, genel sürüm kaydı ve site paketi eşleştikten sonra eski yerel çıktı
+silinir. Kullanıcı ayarları, alınmış dosyalar, kaynak, test ve lisans belgeleri korunur.
+Kurulu uygulamalar kendiliğinden güncellenmez; iki bilgisayar da yeni setup'ı kurar.
 
-## Test kapsamı
+Canlı site 15 Ekim tarayıcı kontrolünde HTTPS, CSS ve GitHub indirmesiyle açıldı.
+Bu güncellemenin hosting dosyaları ayrıca yüklenmelidir; indirme düğmesi GitHub'daki
+geçerli sürüm kaydını okur. Yüklenecek çıktı çalışma alanındaki RK-Screen-Site.zip'tir.
 
-Birim testleri; gerçek yerel PeerJS/WebRTC ile ekran, aynı doğrulama kodu, kalite ayarları,
-iki imleç, kesinti, sohbet, dosya, monitör geçişi; Windows arayüz/açılış/gerçek yakalama ve
-paket içerik testleri uygulanır. Yerel test ile farklı internetlerde saha testi birbirinin
-yerine geçmez. Testler kullanıcının gerçek masaüstüne tuş/fare basmaz.
-
-## İlk fiziksel test
-
-İki cihazda **Beta 1 · 20261015.3** kurun. Aynı doğrulama kodunu gördüğünüzü kontrol edin.
-Önce Otomatik, sonra Net metin profilini aynı hareketli içerikle karşılaştırın. Her iki taraftan
-Rapor kaydet ile ölçüm alın; doğrudan/aktarma rotası, çözünürlük, gerçek FPS, gecikme/kayıp
-ve donma anını birlikte inceleyin. Yalnızca düşük FPS, hareketsiz masaüstünde tek başına hata değildir.
-
-## Ücretsiz MVP çalışma planı — 15 Ekim 2026
-
-Bütçe sıfırdır. Yeni hesap, hizmet başvurusu veya ücretli sertifika gerektiren bir
-adım uygulanmaz. Tek sürüm adı **Beta 1 / 1.0.0-beta.1** olarak kalır; güncellemeler
-yapı numarasıyla ayrılır. Eski paket ancak yenisi doğrulandıktan sonra kaldırılır.
-Kullanıcı dosyaları, kurulu ayarlar ve alınmış dosyalar temizliğe dahil değildir.
-
-### Bu MVP'de uygulananlar
-
-- [x] İnternet yok, cihaz bulunamadı, istek reddi/kapalı/busy, sürüm uyumsuzluğu,
-  ekran yakalama, hizmet ve doğrudan bağlantı hataları için neden/çözüm açıklamaları.
-- [x] İki görsel imleç: ekran sahibinin son yerel konumu uzaktan hareketten ayrı
-  korunur; kontrol sırasında paylaşan masaüstünde de yerel konum işaretçisi gösterilir.
-  Windows tek gerçek sistem imleci kullanır; bunlar iki bağımsız görsel işaretçidir.
-- [x] Yerel fare hareketi algılanınca uzak fare **ve klavye** 1,2 saniyelik sessizlik
-  süresine kadar bekletilir. Ekran sahibi kontrolü ayrıca elle duraklatabilir.
-  Bu, tüm uygulamalardaki fiziksel klavyeyi izleyen bir genel klavye kancası değildir.
-- [x] Yalnızca işaretle modu ve tıklama üretmeyen geçici konum vurgusu. Serbest çizim
-  bu ilk MVP'ye dahil değildir. İşaretçi iznini ekran sahibi yönetir.
-- [x] Süren kayıp/gecikme birlikte görüldüğünde FPS hedefinin azaltılması; bitrate
-  tavanının önceki düzeltmesi korunur. Sadece yüksek gecikme kaliteyi düşürmez.
-- [x] Dosya gönderiminde görüntüye öncelik: tahmini kapasitenin dörtte biri,
-  64 kbit/sn–2 Mbit/sn arasında dosya gönderim bütçesi. Kullanıcı arayüzü gerçek
-  aktarım hızını gösterir. Ağ tahmini bağımsız hız testi değildir.
-- [x] Donma sayısı/süresi destekleniyorsa rapora eklenir. Rapor yapı numarası taşır.
-- [x] En fazla 20 dosyalık gönderim kuyruğu; dosya başına en çok 512 MB, her dosyada
-  ayrı alıcı onayı. Kuyruk dosya içeriğini belleğe yüklemez. Dosya değişirse durur.
-- [x] Sohbette arama, mesaj kopyalama, kullanıcı isteğiyle yerel metin dışa aktarma.
-- [x] Cihaz favorileri, yerel adlandırma, tek tek silme; geçmiş temizliğinde favorileri
-  koruma ve ayrıca tüm cihazları temizleme. Favori olmak onayı atlatmaz.
-- [x] Ayarlar'dan GitHub yapı güncelliği kontrolü. Yalnızca sabit güvenilir depo adresi
-  kabul edilir; süre/boyut sınırı vardır. Kullanıcı isteğiyle indirme açılır;
-  otomatik kurulum veya imzalıymış gibi gösterme yoktur.
-- [x] Oturum mesaj hız sınırları; aşırı fare/sohbet trafiği sınırlanır. Girdi bırakma
-  komutu ve tuş/fare bırakma olayları sınır dolduğunda da çalışır. Fare hareketi ve
-  klavye ayrı bütçe kullanır. Dosya parça onayları sayısal olarak doğrulanır.
-
-### Yayın kabulü
-
-1. Birim, arayüz, yerel gerçek WebRTC, işaretçi, Windows ana süreç/ekran yakalama ve
-   açılış testleri. Çoklu dosyada her alıcı onayı, dosya özeti ve ters yönde boş dosya.
-2. Aday setup oluşturma ve paket içeriğini kaynakla karşılaştırma. Doğrulanmış yeni
-   setup ile SHA-256 birlikte yayımlanır; sonra eski yerel çıktı kaldırılır.
-3. **Ayrı temiz Windows 10/11 kurulumu, gerçek eski sürüm üzerine yükseltme ve kaldırma
-   henüz tamamlanmış kabul edilmez.** Bu bilgisayarda kaynak testleri bunların yerine geçmez.
-4. Yarın iki fiziksel cihazda aynı yeni yapıyı kurup Otomatik/Net metin karşılaştırın.
-   Her profilde 2 dakika küçük yazı, kaydırma ve hareketli içerik; ayrıca dosya gönderirken
-   görüntü, iki imleç, kontrolü duraklatma, Türkçe yazı ve bağlantıyı bitirme.
-   İki taraftan Rapor kaydet çıktısı alın. Aynı koşullardaki önceki yapıyla kıyaslayın.
-
-### Altyapı ve sonraki aşama
-
-- [ ] **Farklı internetlerde her ağ için bağlantı:** çalışan varsayılan TURN hâlâ
-  yoktur. Ücretsiz Coturn yazılımı vardır; internetten erişilebilen bir makine ve
-  trafik gerekir. OpenRelay'in normal ücretsiz hizmeti hesap ister; bu kısıtla
-  başvuru yapılmaz. Çalışmayan genel kimlik bilgileri varsayılan pakete eklenmez.
-  Doğrudan bağlantı mümkünse mevcut sinyal/STUN yolu kullanılır. Uygulama veya
-  statik InfinityFree/GitHub sitesi tek başına aktarma sunucusu sağlamaz.
-- [ ] Kopan dosyayı güvenli biçimde devam ettirme, serbest çizim, kalıcı cihaz
-  eşleştirme/anahtar iptali ve bağımsız güvenlik incelemesi sonraki aşamadadır.
-- [ ] Uyku/uyanma, Wi-Fi değişimi, Türkçe Q/F ve karma DPI/çoklu monitörde fiziksel test.
-- [x] Canlı site: 15 Ekim tarayıcı kontrolünde HTTPS, CSS, logo ve GitHub indirme
-  bağlantısı doğrulandı. Bu kontrol farklı tarayıcı/cihazların tümünü kapsamaz.
-- [ ] Yeni tanıtım metinlerini içeren güncel site ZIP'ini hosting'e yükleme.
-  İndirme düğmesi GitHub'daki güncel paket kaydını okur; hosting metinleri ayrı güncellenir.
-
-Kaynaklar: [WebRTC TURN](https://webrtc.org/getting-started/turn-server),
-[OpenRelay](https://www.metered.ca/tools/openrelay/), [freeSTUN](https://freestun.net/),
-[WebRTC](https://www.w3.org/TR/webrtc/).
+Kaynaklar: [WebRTC istatistikleri](https://www.w3.org/TR/webrtc-stats/),
+[TURN](https://webrtc.org/getting-started/turn-server),
+[Windows Akıllı Uygulama Denetimi](https://support.microsoft.com/en-us/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions).

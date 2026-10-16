@@ -1,6 +1,6 @@
 # RK Screen — Beta 1
 
-Windows x64 için Türkçe ekran paylaşımı ve uzaktan destek. Güncel yapı **20261015.3**;
+Windows x64 için Türkçe ekran paylaşımı ve uzaktan destek. Güncel yapı **20261016.1**;
 tek yayın sürümü **1.0.0-beta.1**. MIT lisansıyla açık kaynak. Koyu arayüz ve RK monogramı.
 
 [Güncel durum ve açık işler](GUNCEL-DURUM.md) ·
@@ -9,7 +9,7 @@ tek yayın sürümü **1.0.0-beta.1**. MIT lisansıyla açık kaynak. Koyu aray�
 
 ## Kullanım
 
-1. İki bilgisayara da güncel Beta 1 setup'ını kurun. Eski Beta 1 yapılarıyla bağlantı kurulmayabilir; yapı numarası iki tarafta **20261015.3** olmalıdır.
+1. İki bilgisayara da güncel Beta 1 setup'ını kurun. Eski Beta 1 yapılarıyla bağlantı kurulmayabilir; yapı numarası iki tarafta **20261016.1** olmalıdır.
 2. Karşı bilgisayarın dokuz haneli kimliğini girin. Ekranını paylaşan kişi monitörü ve izinleri seçip isteği kabul eder. Kontrol, pano ve ses ayrı izinlerdir.
 3. Her iki taraftaki bağlantı doğrulama kodunu başka bir güvenilir iletişim yoluyla karşılaştırın. Kodlar farklıysa bağlantıyı bitirin. Görünen bilgisayar adı tek başına kimlik kanıtı değildir.
 4. Fare/klavye izni verildiyse araç çubuğunda **Fare ve klavye** seçip uzak ekrana tıklayın. **Yalnızca izle** modunda girdi gönderilmez.
@@ -30,7 +30,7 @@ ile şifrelenir; aynı kimlik bilgileriyle dört UDP/TCP/TLS adresi girilebilir.
 
 Otomatik kalite zayıf bağlantıda önce kare hızını, daha sonra kontrollü ölçekte görüntü
 boyutunu azaltır. Profil tavanı düşük ağ tahminine tekrar tekrar kırpılmaz. Fare/imleç
-paketleri ayrı hızlı kanalda taşınır. Kısa görüntü kesintilerinde ilk yeni kareye kadar
+paketleri ayrı hızlı kanalda; klavye, tıklama ve bağlantı yoklaması dosyalardan ayrı güvenilir kanalda taşınır. Kısa görüntü kesintilerinde ilk yeni kareye kadar
 girdi bekletilir. Uzun kesintilerde sınırlı yeniden kurma vardır. Veri oturumu kapanırsa
 eski onayla yeni bağlantı açılmaz. Tuş/fare tutmaları karşı taraf etkinliği kesilince bırakılır.
 

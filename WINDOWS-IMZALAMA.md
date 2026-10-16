@@ -1,6 +1,6 @@
 # RK Screen Beta 1 — Windows kod imzalama
 
-15 Ekim 2026. Tek dağıtım `1.0.0-beta.1`, yapı `20261015.3`, Windows x64 NSIS setup.
+16 Ekim 2026. Tek dağıtım `1.0.0-beta.1`, yapı `20261016.1`, Windows x64 NSIS setup.
 Güncel dosya özeti `dist/1.0.0-beta.1/SHA256SUMS.txt` içindedir.
 
 ## Mevcut karar

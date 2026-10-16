@@ -138,6 +138,18 @@ test('Continuous motion cannot starve keyboard releases or discard fractional ra
   assert.ok(admitted >= 170 && admitted <= 181, `continuous motion admitted ${admitted}`);
 });
 
+test('Legitimate fast file bursts preserve every chunk and receipt without starving control', () => {
+  const guard = new SessionTraffic();
+  for (let i = 0; i < 100; i++) {
+    assert.equal(guard.allow({ type: 'file-chunk' }, 0), true);
+    assert.equal(guard.allow({ type: 'file-reply', status: 'chunk' }, 0), true);
+  }
+  assert.equal(guard.allow('key', 0), true);
+  assert.equal(guard.allow('chat', 0), true);
+  for (let i = 100; i < 128; i++) assert.equal(guard.allow({ type: 'file-chunk' }, 0), true);
+  assert.equal(guard.allow({ type: 'file-chunk' }, 0), false);
+});
+
 test('Loss with delay lowers the frame budget without ratcheting bitrate; freeze telemetry handles reset', () => {
   const profile = { bitrate: 16000000, fps: 60 };
   const a = new AdaptiveQuality();

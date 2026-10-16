@@ -130,4 +130,4 @@ class InputInjector {
     if (failure) throw failure;
   }
 }
-module.exports = { InputInjector };
+module.exports = { InputInjector, readCursorPosition: () => driver().position() };

@@ -83,6 +83,18 @@ function authorized(token) {
   if (!session || token !== session.token) throw new Error('Etkin oturum bulunamadı.');
   return session;
 }
+let cursorFallbackReported = false;
+function readHostCursor() {
+  try {
+    return injector?.position() || require('./input/injector').readCursorPosition();
+  } catch {
+    // A blocked native DLL must not also disable consented view-only sharing.
+    if (!cursorFallbackReported)
+      logEvent('native-cursor-unavailable: using view-only cursor fallback');
+    cursorFallbackReported = true;
+    return screen.dipToScreenPoint(screen.getCursorScreenPoint());
+  }
+}
 async function closeFiles() {
   await receiver?.cancel();
   await sender.cancel();
@@ -363,7 +375,9 @@ handle('video-state', (token, options) => {
   s.videoKey = options.videoKey;
   if (!sameDisplay) s.cursor = new CursorOwnership();
   if (changedVideoKey) s.cursor.sequence = 0;
-  s.cursor.observe(screen.dipToScreenPoint(screen.getCursorScreenPoint()), Date.now());
+  // Use the same native coordinate source as input injection. Mixing Electron
+  // DIP round-trips with GetCursorPos can classify our own move as local input.
+  s.cursor.observe(readHostCursor(), Date.now());
 });
 handle('pointer-enabled', (token, enabled) => {
   const s = authorized(token);
@@ -479,7 +493,7 @@ handle('cursor', (token) => {
   const s = authorized(token);
   if (s.role !== 'host') return null;
   const b = s.display.bounds;
-  s.cursor.observe(screen.dipToScreenPoint(screen.getCursorScreenPoint()), Date.now());
+  s.cursor.observe(readHostCursor(), Date.now());
   const control = s.controlPaused ? 'manual' : Date.now() < s.cursor.localUntil ? 'local' : 'none';
   if (control !== 'none') injector?.releaseAll();
   const p = s.cursor.local ? screen.screenToDipPoint(s.cursor.local) : null;

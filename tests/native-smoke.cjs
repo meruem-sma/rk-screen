@@ -11,10 +11,27 @@ clipboard.readText = async () => testClipboard;
 clipboard.writeText = async (text) => {
   testClipboard = text;
 };
-const { InputInjector } = require('../src/input/injector');
+const inputModule = require('../src/input/injector');
+const { InputInjector } = inputModule;
 const nativeInput = new InputInjector();
 assert.ok(Number.isFinite(nativeInput.position().x));
 nativeInput.releaseAll();
+// Keep real capture/IPC tests, but never move the user's mouse or type into apps.
+// Deliberately disagree with Electron's DIP reader to reproduce mixed-DPI polling.
+let testPosition = { x: 100, y: 100 };
+let nativeReads = 0;
+inputModule.readCursorPosition = () => {
+  if (++nativeReads === 1) throw Error('Test: native cursor DLL unavailable');
+  return { ...testPosition };
+};
+InputInjector.prototype.position = () => ({ ...testPosition });
+InputInjector.prototype.moveMouse = (x, y) => {
+  testPosition = { x, y };
+};
+InputInjector.prototype.send = () => {};
+app.whenReady().then(() => {
+  require('electron').screen.getCursorScreenPoint = () => ({ x: -999999, y: -999999 });
+});
 app.on('browser-window-created', (_event, win) => {
   if (win.getTitle() === 'RK Screen işaretçi') {
     win.showInactive = () => {};
@@ -74,6 +91,11 @@ app.on('browser-window-created', (_event, win) => {
         const info=await rkScreen.info();
         const sources=await rkScreen.sources();
         if(!sources.length)throw Error('No display sources');
+        const preview=await rkScreen.begin({role:'host',displayId:sources[0].displayId,input:false,clipboard:false,remoteName:'Preview'});
+        const previewKey='33333333-3333-4333-8333-333333333333';
+        await rkScreen.videoState(preview,{videoKey:previewKey,displayId:sources[0].displayId});
+        const viewOnlyWithoutNative=await rkScreen.videoReady(preview,previewKey)===true;
+        await rkScreen.end(preview);
         let denied=false;
         try{await rkScreen.input('invalid',{type:'key',code:'KeyA',pressed:true});}catch{denied=true;}
         const token=await rkScreen.begin({role:'host',displayId:sources[0].displayId,input:false,clipboard:false,remoteName:'Enes'});
@@ -87,6 +109,11 @@ app.on('browser-window-created', (_event, win) => {
         const wrongReadyBlocked=await rkScreen.videoReady(token,key2)===false;
         const currentReadyAccepted=await rkScreen.videoReady(token,key1)===true;
         const readyKeepAliveAccepted=await rkScreen.inputKeepAlive(token)===true;
+        await rkScreen.cursor(token);
+        const nativeMoveAccepted=await rkScreen.input(token,{type:'mouse-move',x:0.5,y:0.5,sequence:1,videoKey:key1})===true;
+        const injectedMoveNotLocal=(await rkScreen.cursor(token)).control==='none' && (await rkScreen.cursor(token)).control==='none';
+        const keyboardAfterMove=await rkScreen.input(token,{type:'key',code:'KeyA',pressed:true,videoKey:key1})===true;
+        await rkScreen.input(token,{type:'key',code:'KeyA',pressed:false,videoKey:key1});
         await rkScreen.pauseControl(token,true);
         const manualPauseInputBlocked=await rkScreen.input(token,{type:'text',text:'do not type',videoKey:key1})===false;
         const manualPauseKeepAliveBlocked=await rkScreen.inputKeepAlive(token)===false;
@@ -121,7 +148,7 @@ app.on('browser-window-created', (_event, win) => {
         let controllerSwitchBlocked=false;
         try{await rkScreen.videoState(controller,{videoKey:key1,displayId:sources[0].displayId});}catch{controllerSwitchBlocked=true;}
         await rkScreen.end(controller);
-        return {version:info.version,compatibility:info.compatibility,sources:sources.length,denied,inputBlocked,viewOnlyKeepAliveBlocked,pausedKeepAliveBlocked,readyKeepAliveAccepted,manualPauseInputBlocked,manualPauseKeepAliveBlocked,manualPauseReported,controllerKeepAliveBlocked,transitionInputBlocked,wrongReadyBlocked,currentReadyAccepted,staleInputBlocked,staleReadyBlocked,missingScreenBlocked,controllerSwitchBlocked,pausedPointerBlocked,oldPointerBlocked,disabledPointerBlocked,viewOnlyPointerAccepted,clipboardBlocked,clipboardAsyncRead,clipboardAsyncWrite,width:settings.width,height:settings.height};
+        return {version:info.version,compatibility:info.compatibility,sources:sources.length,viewOnlyWithoutNative,denied,inputBlocked,viewOnlyKeepAliveBlocked,pausedKeepAliveBlocked,readyKeepAliveAccepted,nativeMoveAccepted,injectedMoveNotLocal,keyboardAfterMove,manualPauseInputBlocked,manualPauseKeepAliveBlocked,manualPauseReported,controllerKeepAliveBlocked,transitionInputBlocked,wrongReadyBlocked,currentReadyAccepted,staleInputBlocked,staleReadyBlocked,missingScreenBlocked,controllerSwitchBlocked,pausedPointerBlocked,oldPointerBlocked,disabledPointerBlocked,viewOnlyPointerAccepted,clipboardBlocked,clipboardAsyncRead,clipboardAsyncWrite,width:settings.width,height:settings.height};
       })()`);
       assert.equal(result.denied, true);
       assert.equal(result.inputBlocked, true);
@@ -129,6 +156,10 @@ app.on('browser-window-created', (_event, win) => {
         'viewOnlyKeepAliveBlocked',
         'pausedKeepAliveBlocked',
         'readyKeepAliveAccepted',
+        'nativeMoveAccepted',
+        'viewOnlyWithoutNative',
+        'injectedMoveNotLocal',
+        'keyboardAfterMove',
         'manualPauseInputBlocked',
         'manualPauseKeepAliveBlocked',
         'manualPauseReported',

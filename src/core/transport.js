@@ -155,15 +155,53 @@
       this.pc = pc;
       this.receive = receive;
       this.channel = null;
+      this.inputChannel = null;
       this.sent = 0;
       this.seen = new Map();
       if (!pc) return;
       this.previous = pc.ondatachannel;
       this.handler = (event) => {
-        if (event.channel.label === 'rk-screen-live-v8') this.attach(event.channel);
+        if (event.channel.label === 'rk-screen-live-v9') this.attach(event.channel);
+        else if (event.channel.label === 'rk-screen-input-v9') this.attachInput(event.channel);
         else this.previous?.call(pc, event);
       };
       pc.ondatachannel = this.handler;
+    }
+    attachInput(channel) {
+      if (
+        this.inputChannel ||
+        !channel.ordered ||
+        channel.maxRetransmits !== null ||
+        channel.maxPacketLifeTime !== null
+      ) {
+        channel.close();
+        return;
+      }
+      this.inputChannel = channel;
+      channel.onmessage = (event) => {
+        if (typeof event.data !== 'string' || event.data.length > 2048) return;
+        try {
+          const m = JSON.parse(event.data);
+          if (this.isInput(m.type)) this.receive(m);
+        } catch {}
+      };
+    }
+    isInput(type) {
+      return [
+        'key',
+        'text',
+        'mouse-button',
+        'mouse-wheel',
+        'release-input',
+        'ping',
+        'pong',
+      ].includes(type);
+    }
+    sendInput(message) {
+      if (!this.isInput(message.type) || this.inputChannel?.readyState !== 'open') return false;
+      if (this.inputChannel.bufferedAmount > 65536) throw Error('Kontrol kanalı yoğun.');
+      this.inputChannel.send(JSON.stringify(message));
+      return true;
     }
     attach(channel) {
       if (this.channel || channel.ordered || channel.maxRetransmits !== 0) {
@@ -189,8 +227,10 @@
     start() {
       if (this.pc && !this.channel)
         this.attach(
-          this.pc.createDataChannel('rk-screen-live-v8', { ordered: false, maxRetransmits: 0 }),
+          this.pc.createDataChannel('rk-screen-live-v9', { ordered: false, maxRetransmits: 0 }),
         );
+      if (this.pc && !this.inputChannel)
+        this.attachInput(this.pc.createDataChannel('rk-screen-input-v9', { ordered: true }));
     }
     send(message) {
       if (this.channel?.readyState !== 'open') return false;
@@ -205,7 +245,12 @@
         this.channel.onmessage = null;
         this.channel.close();
       }
+      if (this.inputChannel) {
+        this.inputChannel.onmessage = null;
+        this.inputChannel.close();
+      }
       this.channel = null;
+      this.inputChannel = null;
       this.pc = null;
     }
   }

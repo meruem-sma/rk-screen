@@ -59,7 +59,7 @@ test('Sustained weak links reduce frames before scaling; text mode keeps full re
 test('Real-time lane keeps PeerJS control channel, discards old motion and cannot inject reliable commands', () => {
   let originalEvents = 0;
   const channel = {
-    label: 'rk-screen-live-v8',
+    label: 'rk-screen-live-v9',
     ordered: false,
     maxRetransmits: 0,
     readyState: 'open',
@@ -76,7 +76,9 @@ test('Real-time lane keeps PeerJS control channel, discards old motion and canno
     ondatachannel() {
       originalEvents++;
     },
-    createDataChannel() {
+    createDataChannel(label) {
+      if (label === 'rk-screen-input-v9')
+        return { ...channel, label, ordered: true, maxRetransmits: null, maxPacketLifeTime: null };
       return channel;
     },
   };
@@ -103,6 +105,44 @@ test('Real-time lane keeps PeerJS control channel, discards old motion and canno
   lane.close();
   pc.ondatachannel({ channel: { label: 'peerjs-control' } });
   assert.equal(originalEvents, 2);
+  assert.equal(channel.closed, true);
+});
+
+test('Reliable input has an ordered lane separate from files and rejects unrelated commands', () => {
+  const received = [],
+    sent = [];
+  const pc = {};
+  const lane = new RealtimeLane(pc, (m) => received.push(m));
+  const channel = {
+    label: 'rk-screen-input-v9',
+    ordered: true,
+    maxRetransmits: null,
+    maxPacketLifeTime: null,
+    readyState: 'open',
+    bufferedAmount: 0,
+    send: (m) => sent.push(JSON.parse(m)),
+    close() {
+      this.closed = true;
+    },
+  };
+  pc.ondatachannel({ channel });
+  assert.equal(lane.sendInput({ type: 'key', code: 'KeyA', pressed: true }), true);
+  assert.equal(lane.sendInput({ type: 'release-input' }), true);
+  assert.equal(lane.sendInput({ type: 'file-chunk' }), false);
+  channel.onmessage({ data: JSON.stringify({ type: 'text', text: 'ş' }) });
+  channel.onmessage({ data: JSON.stringify({ type: 'bye' }) });
+  channel.onmessage({ data: 'x'.repeat(2049) });
+  assert.equal(received.length, 1);
+  assert.equal(sent.length, 2);
+  const duplicate = {
+    ...channel,
+    close() {
+      this.closed = true;
+    },
+  };
+  pc.ondatachannel({ channel: duplicate });
+  assert.equal(duplicate.closed, true);
+  lane.close();
   assert.equal(channel.closed, true);
 });
 

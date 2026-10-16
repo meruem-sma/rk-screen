@@ -185,15 +185,17 @@
           ? 'control'
           : type;
       const [rate, capacity] =
-        group === 'motion'
-          ? [180, 240]
-          : group === 'control'
-            ? [120, 180]
-            : group === 'chat'
-              ? [8, 16]
-              : group === 'clipboard'
-                ? [4, 8]
-                : [60, 90];
+        type === 'file-chunk' || (type === 'file-reply' && message.status === 'chunk')
+          ? [128, 128]
+          : group === 'motion'
+            ? [180, 240]
+            : group === 'control'
+              ? [120, 180]
+              : group === 'chat'
+                ? [8, 16]
+                : group === 'clipboard'
+                  ? [4, 8]
+                  : [60, 90];
       const previous = this.buckets.get(group) || { tokens: capacity, time: now };
       const tokens = Math.min(
         capacity,

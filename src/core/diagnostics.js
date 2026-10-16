@@ -4,7 +4,17 @@
   else root.RKScreenDiagnostics = value;
 })(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   const choices = {
-    event: ['connection', 'video', 'receive', 'recovery', 'quality', 'relay-error'],
+    event: [
+      'connection',
+      'video',
+      'receive',
+      'recovery',
+      'quality',
+      'relay-error',
+      'file',
+      'control',
+    ],
+    control: ['none', 'manual', 'local'],
     state: ['online', 'offline', 'waiting', 'unsupported'],
     route: ['direct', 'relay', 'unknown'],
     limitation: ['none', 'bandwidth', 'cpu', 'other', 'unknown'],
@@ -26,6 +36,8 @@
     'sentWidth',
     'sentHeight',
     'buffered',
+    'fileBudget',
+    'ackMs',
     'code',
   ];
   function sanitizeEvents(entries) {

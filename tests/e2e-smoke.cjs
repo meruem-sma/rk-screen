@@ -151,11 +151,12 @@ app
     });
     const port = server.address().port;
     const bootstrap = `
-    window.testLiveChannels=[];
+    window.testLiveChannels=[];window.testInputChannels=[];
     const originalDataChannel=RTCPeerConnection.prototype.createDataChannel;
     RTCPeerConnection.prototype.createDataChannel=function(label,options){
       const channel=originalDataChannel.call(this,label,options);
-      if(label==='rk-screen-live-v8')testLiveChannels.push(channel);
+      if(label==='rk-screen-live-v9')testLiveChannels.push(channel);
+      if(label==='rk-screen-input-v9')testInputChannels.push(channel);
       return channel;
     };
     const RealPeer = window.Peer;
@@ -218,7 +219,7 @@ app
         videoTransitions: 0,
         writes: [],
         clipboard: 'private baseline ' + i,
-        payload: i ? crypto.randomBytes(100123) : Buffer.alloc(0),
+        payload: i ? crypto.randomBytes(2 * 1024 * 1024 + 123) : Buffer.alloc(0),
         receiver: new FileReceiver(dir),
         saved: [],
         sender: new FileSender(),
@@ -303,6 +304,23 @@ app
         "window.dataPc=Object.values(testPeer.connections).flat().find(c=>c.type==='data'&&c.open);Object.defineProperty(dataPc.dataChannel,'bufferedAmount',{configurable:true,get:()=>1000000});const v=document.getElementById('viewport'),r=document.getElementById('video-stage').getBoundingClientRect();v.focus();v.dispatchEvent(new PointerEvent('pointermove',{clientX:r.left+r.width/2,clientY:r.top+r.height/2}));",
       );
       const pointerCount = hostState.pointers.length;
+      await wait(controller, "testInputChannels.some(c=>c.readyState==='open')");
+      const beforeBacklog = hostState.inputs.length;
+      await run(
+        controller,
+        "const v=document.getElementById('viewport');v.dispatchEvent(new KeyboardEvent('keydown',{key:'ş',code:'KeyS',bubbles:true,cancelable:true}));",
+      );
+      for (
+        let i = 0;
+        i < 40 &&
+        !hostState.inputs.slice(beforeBacklog).some((m) => m.type === 'text' && m.text === 'ş');
+        i++
+      )
+        await delay(25);
+      assert.ok(
+        hostState.inputs.slice(beforeBacklog).some((m) => m.type === 'text' && m.text === 'ş'),
+        'keyboard uses its reliable lane while the file channel is backed up',
+      );
       assert.equal(await run(controller, "document.getElementById('self-cursor').hidden"), false);
       assert.equal(await run(controller, "document.getElementById('remote-cursor').hidden"), false);
       assert.equal(
@@ -833,7 +851,8 @@ app
         controlStatusAndReapproval: true,
         clipboardBaselinePrivate: true,
         clipboardNewText: true,
-        receivedBytes: 100123,
+        receivedBytes: controllerState.payload.length,
+        reliableInputLane: true,
         reverseEmptyFile: true,
         approvedMultiFileQueue: true,
         hostPauseBlocksKeyboard: true,

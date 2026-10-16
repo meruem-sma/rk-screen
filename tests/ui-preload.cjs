@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('rkScreen', {
   info: async () => ({
     name: 'Çalışma bilgisayarı',
     version: localStorage.getItem('test-product-version') || '1.0.0-beta.1',
-    build: '20261015.3',
+    build: '20261016.1',
   }),
   checkUpdate: async () => ({ available: true, build: '20261016.1', signed: false }),
   openUpdate: async () => {},
