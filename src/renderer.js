@@ -29,6 +29,7 @@
   const {
     selectedRoute,
     receiveSample,
+    sendSample,
     AdaptiveQuality,
     RecoveryBudget,
     RealtimeLane,
@@ -37,6 +38,14 @@
   const adaptive = new AdaptiveQuality();
   const filePacer = new window.RKScreenTransfer.FilePacer();
   let oldSendStats = null;
+  let lastControlSent = '',
+    lastControlTime = 0,
+    remoteControlRevision = 0;
+  let remoteControlState = 'ready',
+    remotePointerEnabled = true;
+  let fullscreenActive = false,
+    fullscreenChanging = false,
+    focusAfterFullscreen = false;
   const diagnostics = new window.RKScreenDiagnostics.Diagnostics();
   const signalingRetry = new RetryBackoff();
   let recoveryTimer = null,
@@ -55,6 +64,7 @@
     deviceId = '',
     connectedName = '';
   let quality = 'balanced',
+    runtimeCompatibility = false,
     remotePaused = false,
     remoteInput = false,
     remoteClipboard = false,
@@ -78,6 +88,7 @@
     pressedButtons = new Set(),
     lastCursor = null,
     ownCursor = null;
+  let lastInputSample = 0;
   let transfer = null,
     fileWaiter = null,
     fileTimer = null,
@@ -171,7 +182,20 @@
       }
       conn.send(data);
       return true;
-    } catch {
+    } catch (err) {
+      if (inputTypes.has(data.type) && data.type !== 'release-input') {
+        // A failed key/button send must not strand earlier pressed input.
+        try {
+          conn.send({ type: 'release-input', videoKey });
+        } catch {}
+        pressedButtons.clear();
+        unicodeKeys.clear();
+        pendingMouse = null;
+        if (Date.now() - lastInputError > 5000) {
+          lastInputError = Date.now();
+          toast('Kontrol kanalı yoğun veya kesildi. Tuşlar bırakıldı; yeniden tıklayın.', true);
+        }
+      }
       return false;
     }
   }
@@ -617,7 +641,7 @@
       mandatory: {
         chromeMediaSource: 'desktop',
         chromeMediaSourceId: source.id,
-        maxFrameRate: 60,
+        maxFrameRate: runtimeCompatibility ? 30 : 60,
         ...(source.width && source.height
           ? {
               minWidth: source.width,
@@ -917,7 +941,19 @@
     if (inputTypes.has(m.type)) {
       if (gate.role === 'host') {
         try {
-          await api.input(token, m);
+          const currentKey = videoKey;
+          const applyStart = performance.now();
+          const result = await api.input(token, m);
+          if (gate.connection === conn && videoKey === currentKey) {
+            publishControl(result, currentKey);
+            if (m.type !== 'mouse-move' && performance.now() - lastInputSample > 250) {
+              diagnostics.record('input', {
+                reason: result?.reason,
+                applyMs: performance.now() - applyStart,
+              });
+              lastInputSample = performance.now();
+            }
+          }
         } catch (err) {
           if (Date.now() - lastInputError > 5000) {
             lastInputError = Date.now();
@@ -969,10 +1005,34 @@
         }
         break;
       case 'input-error':
+        remoteControlState = 'windows';
+        releaseInput(false);
+        updateControlStatus();
         toast(
           'Windows kontrolü engelledi. Karşı bilgisayardaki izinleri ve uygulamanın yetki düzeyini kontrol edin.',
           true,
         );
+        break;
+      case 'control-state':
+        if (
+          gate.role === 'controller' &&
+          m.videoKey === videoKey &&
+          m.revision >= remoteControlRevision
+        ) {
+          const changed = remoteControlState !== m.state;
+          remoteControlRevision = m.revision;
+          remoteControlState = m.state;
+          remotePointerEnabled = m.pointerEnabled;
+          remotePaused = ['local', 'manual', 'permission', 'video', 'busy'].includes(m.state);
+          if (changed && (remotePaused || m.state === 'windows')) releaseInput(false);
+          if (!remotePointerEnabled) {
+            pendingPointer = null;
+            ownCursor = null;
+          }
+          if (changed) diagnostics.record('control', { control: m.state });
+          updateControlStatus();
+          positionCursor();
+        }
         break;
       case 'bye':
         cleanup('Karşı taraf bağlantıyı bitirdi.');
@@ -983,7 +1043,13 @@
         break;
       case 'pong':
         lastPong = Date.now();
-        $('stat-ping').textContent = Math.max(0, Math.round(performance.now() - m.time)) + ' ms';
+        {
+          const rtt = Math.max(0, performance.now() - m.time);
+          $('stat-ping').textContent = Math.round(rtt) + ' ms';
+          $('stat-ping').title =
+            'Veri kanalında gidiş-dönüş süresi; görüntünün uçtan uca gecikmesi değildir.';
+          diagnostics.record('data-network', { rtt });
+        }
         break;
       case 'chat':
         send({ type: 'chat-ack', id: m.id });
@@ -1038,15 +1104,13 @@
         if (gate.role === 'controller' && m.videoKey === videoKey) {
           if (m.control !== lastCursor?.control)
             diagnostics.record('control', { control: m.control || 'none' });
-          const paused = m.control === 'local' || m.control === 'manual';
-          if (paused && !remotePaused) releaseInput(false);
-          remotePaused = paused;
-          $('input-help').textContent =
-            m.control === 'manual'
-              ? 'Ekran sahibi uzak kontrolü duraklattı. İşaretçi kullanılabilir.'
-              : paused
-                ? 'Ekran sahibi faresini kullanıyor; uzak fare ve klavye bekliyor.'
-                : 'Ekran sahibi faresini kullanırken uzak fare ve klavye bekler.';
+          // Legacy hosts only carry state on the lossy position channel.
+          if (!remoteControlRevision) {
+            const paused = m.control === 'local' || m.control === 'manual';
+            if (paused && !remotePaused) releaseInput(false);
+            remotePaused = paused;
+            remoteControlState = paused ? m.control : 'ready';
+          }
           lastCursor = m;
           updateControlStatus();
           positionCursor();
@@ -1103,7 +1167,9 @@
     const track = ownerStream.getVideoTracks()[0];
     if (!track) return;
     const settings = track.getSettings();
-    const p = adaptive.limits(qualitySettings(requested, settings.width, settings.height));
+    const p = adaptive.limits(
+      qualitySettings(requested, settings.width, settings.height, runtimeCompatibility),
+    );
     track.contentHint = p.hint;
     await track.applyConstraints({ frameRate: { ideal: p.fps, max: p.fps } }).catch(qualityFailed);
     if (stream !== ownerStream || media !== ownerMedia) return;
@@ -1132,12 +1198,33 @@
   function clipboardEnabled() {
     return gate.role === 'host' ? $('host-clipboard').checked : $('session-clipboard').checked;
   }
+  function publishControl(status, currentKey) {
+    if (!window.RKScreenControl.validStatus(status) || !currentKey) return;
+    const message = {
+      type: 'control-state',
+      state: status.state,
+      pointerEnabled: status.pointerEnabled,
+      revision: status.revision,
+      videoKey: currentKey,
+    };
+    const signature = JSON.stringify(message);
+    if (signature === lastControlSent && Date.now() - lastControlTime < 1000) return;
+    if (send(message)) {
+      lastControlSent = signature;
+      lastControlTime = Date.now();
+    }
+  }
   function startSession() {
     clearInterval(heartbeat);
     clearInterval(clipTimer);
     clearInterval(cursorTimer);
     clearInterval(pointerTimer);
     lastCursorPacket = '';
+    lastControlSent = '';
+    lastControlTime = 0;
+    remoteControlRevision = 0;
+    remoteControlState = 'ready';
+    remotePointerEnabled = true;
     inputSequence = 0;
     lastPointerSent = 0;
     lastPong = Date.now();
@@ -1177,6 +1264,8 @@
       const currentKey = videoKey;
       try {
         const p = await api.cursor(token);
+        if (gate.connection === owner && videoKey === currentKey && p)
+          publishControl(p, currentKey);
         if (
           gate.connection !== owner ||
           videoKey !== currentKey ||
@@ -1242,20 +1331,21 @@
           let changed = false;
           stats.forEach((r) => {
             if (gate.role === 'host' && r.type === 'outbound-rtp' && r.kind === 'video') {
-              const elapsed = oldSendStats?.id === r.id ? r.timestamp - oldSendStats.timestamp : 0;
-              const videoBitrate =
-                elapsed > 0 && r.bytesSent >= oldSendStats.bytesSent
-                  ? ((r.bytesSent - oldSendStats.bytesSent) * 8000) / elapsed
-                  : null;
+              const outgoing = sendSample(r, oldSendStats);
               filePacer.updateMedia({
                 ...route,
-                videoBitrate,
+                videoBitrate: outgoing.videoBitrate,
                 limitation: r.qualityLimitationReason,
                 loss: window.RKScreenTransport.remoteLoss(stats.get(r.remoteId)),
               });
-              oldSendStats = { id: r.id, timestamp: r.timestamp, bytesSent: r.bytesSent };
+              oldSendStats = outgoing.previous;
               const source = stream?.getVideoTracks()[0]?.getSettings() || {};
-              const profile = qualitySettings(quality, source.width, source.height);
+              const profile = qualitySettings(
+                quality,
+                source.width,
+                source.height,
+                runtimeCompatibility,
+              );
               changed =
                 adaptive.update(profile, {
                   ...route,
@@ -1264,6 +1354,8 @@
                 }) || changed;
               const effective = adaptive.limits(profile);
               diagnostics.record('video', {
+                encodeMs: outgoing.encodeMs,
+                sentFps: outgoing.sentFps,
                 profile: quality,
                 limitation: r.qualityLimitationReason,
                 route: route.route || 'unknown',
@@ -1425,6 +1517,9 @@
     pressedButtons.clear();
     remoteInput = false;
     remotePaused = false;
+    remoteControlRevision = 0;
+    remoteControlState = 'ready';
+    remotePointerEnabled = true;
     remoteClipboard = false;
     $('host-code').textContent = $('session-code').textContent = 'Doğrulama kodu bekleniyor';
     clipboardBaseline = null;
@@ -1548,25 +1643,58 @@
       gate.role === 'controller' &&
       remoteInput &&
       !remotePaused &&
+      !fullscreenChanging &&
+      document.hasFocus() &&
       !refreshingVideo &&
       $('video-wait').hidden &&
       $('input-mode').value === 'control'
     );
   }
   function updateControlStatus() {
-    if (refreshingVideo) {
-      $('session-state').textContent = 'Görüntü hazırlanıyor · Kontrol beklemede';
+    const help = {
+      ready: 'Ekran sahibi faresini kullanırken uzak kontrol bekler. Çıkış: Ctrl+Alt+Shift+Boşluk.',
+      local: 'Ekran sahibi faresini kullanıyor. İşaretleme açık; tıklama ve klavye bekliyor.',
+      manual: 'Ekran sahibi kontrolü duraklattı. İzin verilen işaretçiler kullanılabilir.',
+      permission:
+        'Ekran sahibi fare ve klavye izni vermedi. Yalnızca izleyebilir veya işaretleyebilirsiniz.',
+      video: 'Yeni görüntü gelene kadar yanlış ekrana tıklamayı önlemek için kontrol bekliyor.',
+      windows:
+        'Windows girdiyi kabul etmedi. Normal bir pencereye yeniden tıklayın; yönetici/UAC pencereleri kontrolü sınırlayabilir.',
+      busy: 'Kontrol bağlantısı yoğun. Girdiler bekletilmeden bırakıldı; yeniden deneyin.',
+    };
+    $('input-help').textContent = help[remoteControlState] || help.ready;
+    if (fullscreenChanging) {
+      $('session-state').textContent = 'Tam ekran değişiyor · Kontrol beklemede';
       return;
     }
-    if (remotePaused) {
-      $('session-state').textContent = 'Ekran sahibinde kontrol · Uzak girdi bekliyor';
+    if (refreshingVideo) {
+      $('session-state').textContent = 'Görüntü hazırlanıyor · Kontrol beklemede';
       return;
     }
     if ($('input-mode').value === 'point') {
       $('session-state').textContent = 'İşaretleme · Tıklama ve klavye gönderilmez';
       return;
     }
-    const active = canControl();
+    if (remoteControlState === 'windows') {
+      $('session-state').textContent = 'Windows girdiyi reddetti · Yeniden tıklayın';
+      return;
+    }
+    if (remotePaused) {
+      $('session-state').textContent =
+        {
+          local: 'Ekran sahibinde kontrol · İşaretleme açık',
+          manual: 'Ekran sahibi kontrolü duraklattı',
+          permission: 'İzleme · Kontrol izni kapalı',
+          video: 'Yeni görüntü bekleniyor · Kontrol beklemede',
+        }[remoteControlState] || 'Kontrol bağlantısı bekleniyor';
+      return;
+    }
+    const active =
+      gate.approved &&
+      remoteInput &&
+      !refreshingVideo &&
+      $('video-wait').hidden &&
+      $('input-mode').value === 'control';
     $('session-state').textContent = !remoteInput
       ? 'İzleme · Karşı taraf kontrol izni vermedi'
       : !active
@@ -1599,7 +1727,7 @@
       $('scale').value,
       window.devicePixelRatio,
     );
-    const ownVisible = !!(ownCursor?.visible && g && !refreshingVideo);
+    const ownVisible = !!(remotePointerEnabled && ownCursor?.visible && g && !refreshingVideo);
     $('self-cursor').hidden = !ownVisible;
     $('viewport').classList.toggle('viewport-pointer-active', ownVisible);
     if (ownVisible) {
@@ -1608,7 +1736,7 @@
       $('self-cursor').classList.toggle('label-left', ownCursor.x > 0.75);
       $('self-cursor').classList.toggle('label-above', ownCursor.y > 0.8);
     }
-    if (!lastCursor?.visible || !g) {
+    if (!remotePointerEnabled || !lastCursor?.visible || !g) {
       $('remote-cursor').hidden = true;
       return;
     }
@@ -1662,6 +1790,7 @@
       positionCursor();
       pendingPointer = { ...(p || { x: 0, y: 0 }), visible: !!p, changed: true };
       if (!canControl()) return;
+      if (document.activeElement !== viewport) return;
       if (!p) return;
       lastCoords = p;
       pendingMouse = p;
@@ -1718,7 +1847,7 @@
     viewport.addEventListener(
       'wheel',
       (e) => {
-        if (!canControl()) return;
+        if (!canControl() || document.activeElement !== viewport) return;
         e.preventDefault();
         const factor = e.deltaMode === 1 ? 30 : e.deltaMode === 2 ? 300 : 1;
         send({
@@ -1731,7 +1860,12 @@
     );
     for (const event of ['keydown', 'keyup'])
       viewport.addEventListener(event, (e) => {
-        if (!canControl() || e.key === 'F11') return;
+        if (
+          !canControl() ||
+          e.key === 'F11' ||
+          (e.ctrlKey && e.altKey && e.shiftKey && e.code === 'Space')
+        )
+          return;
         e.preventDefault();
         if (e.isComposing || e.key === 'Dead') return;
         const printable =
@@ -1752,15 +1886,13 @@
       releaseInput();
       updateControlStatus();
     });
-    window.addEventListener('blur', releaseInput);
+    window.addEventListener('blur', () => {
+      releaseInput();
+      updateControlStatus();
+    });
+    window.addEventListener('focus', updateControlStatus);
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) releaseInput();
-    });
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'F11' && gate.role === 'controller') {
-        e.preventDefault();
-        api.fullscreen().catch(() => {});
-      }
     });
     new ResizeObserver(refreshVideoLayout).observe(viewport);
     window.addEventListener('resize', refreshVideoLayout);
@@ -2065,6 +2197,7 @@
       const info = await api.info();
       name = window.RKScreenPointer.cleanName(info.name);
       $('compatibility-mode').checked = info.compatibility === true;
+      runtimeCompatibility = info.compatibility === true;
       $('machine-name').textContent = name;
       const beta = /-beta\.(\d+)$/.exec(info.version);
       $('app-version').textContent =
@@ -2301,7 +2434,50 @@
     prepareControllerVideo();
     send({ type: 'refresh-video', videoKey });
   });
-  on('fullscreen', 'click', () => api.fullscreen());
+  function updateFullscreen(state) {
+    if (!state || typeof state.active !== 'boolean' || typeof state.changing !== 'boolean') return;
+    const settled = fullscreenChanging && !state.changing;
+    fullscreenActive = state.active;
+    fullscreenChanging = state.changing;
+    const button = $('fullscreen');
+    button.disabled = fullscreenChanging;
+    button.setAttribute('aria-pressed', String(fullscreenActive));
+    button.setAttribute('aria-label', fullscreenActive ? 'Tam ekrandan çık' : 'Tam ekran');
+    button.title = (fullscreenActive ? 'Tam ekrandan çık' : 'Tam ekran') + ' · F11';
+    if (fullscreenChanging) releaseInput();
+    requestAnimationFrame(() => {
+      refreshVideoLayout();
+      if (
+        settled &&
+        focusAfterFullscreen &&
+        document.hasFocus() &&
+        !document.querySelector('dialog[open]') &&
+        $('chat-panel').hidden &&
+        gate.role === 'controller' &&
+        gate.approved
+      )
+        $('viewport').focus();
+      if (settled) focusAfterFullscreen = false;
+      updateControlStatus();
+    });
+  }
+  api?.onFullscreen?.(updateFullscreen);
+  api?.onReleaseControl?.((options) => {
+    releaseInput();
+    focusAfterFullscreen = !options?.escape && document.activeElement === $('viewport');
+    if (options?.escape) $('input-mode').value = 'view';
+    updateControlStatus();
+  });
+  api
+    ?.fullscreenState?.()
+    .then(updateFullscreen)
+    .catch(() => {});
+  on('fullscreen', 'click', async () => {
+    if (fullscreenChanging) return;
+    releaseInput();
+    focusAfterFullscreen = true;
+    updateFullscreen(await api.fullscreen(!fullscreenActive));
+  });
   function refreshVideoLayout() {
     const video = $('remote-video'),
       ratio = window.devicePixelRatio || 1;

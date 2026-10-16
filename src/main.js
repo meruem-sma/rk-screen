@@ -22,6 +22,9 @@ const sender = new FileSender();
 const { validMessage, inputTypes, validVideoKey } = require('./core/session');
 const { cleanName, CursorOwnership } = require('./core/pointer');
 const { CursorOverlay } = require('./cursor-overlay');
+const { fitWindow } = require('./core/window');
+const { snapshot: controlSnapshot } = require('./core/control');
+const { applyInput } = require('./input/controller');
 const pointerOverlay = new CursorOverlay();
 const localPointerOverlay = new CursorOverlay();
 // Keep existing installed users' local settings during the product rename.
@@ -35,6 +38,49 @@ let checkedUpdate = null,
   checkingUpdate = null;
 let fileQueue = Promise.resolve();
 let powerBlocker = null;
+let fullscreenTarget = null,
+  fullscreenTimer = null,
+  fullscreenQueued = null;
+function fullscreenState() {
+  return {
+    active: !!win && !win.isDestroyed() && win.isFullScreen(),
+    changing: fullscreenTarget !== null,
+  };
+}
+function notifyFullscreen() {
+  if (win && !win.isDestroyed()) win.webContents.send('fullscreen-state', fullscreenState());
+}
+function setFullscreen(target) {
+  if (!win || win.isDestroyed()) return { active: false, changing: false };
+  if (fullscreenTarget !== null) {
+    fullscreenQueued = target;
+    return fullscreenState();
+  }
+  if (win.isFullScreen() === target) return fullscreenState();
+  fullscreenTarget = target;
+  notifyFullscreen();
+  clearTimeout(fullscreenTimer);
+  fullscreenTimer = setTimeout(finishFullscreen, 2000);
+  try {
+    win.setFullScreen(target);
+  } catch (error) {
+    clearTimeout(fullscreenTimer);
+    fullscreenTarget = null;
+    fullscreenQueued = null;
+    notifyFullscreen();
+    throw error;
+  }
+  return fullscreenState();
+}
+function finishFullscreen() {
+  clearTimeout(fullscreenTimer);
+  fullscreenTarget = null;
+  const queued = fullscreenQueued;
+  fullscreenQueued = null;
+  if (queued !== null && win && !win.isDestroyed() && win.isFullScreen() !== queued) {
+    setFullscreen(queued);
+  } else notifyFullscreen();
+}
 const runtimeFile = path.join(app.getPath('userData'), 'runtime.json');
 let runtime = {};
 try {
@@ -103,7 +149,10 @@ function endSession() {
   pointerOverlay.close();
   localPointerOverlay.close();
   session = null;
-  if (win && !win.isDestroyed() && win.isFullScreen()) win.setFullScreen(false);
+  clearTimeout(fullscreenTimer);
+  fullscreenTarget = null;
+  fullscreenQueued = null;
+  if (win && !win.isDestroyed() && win.isFullScreen()) setFullscreen(false);
   try {
     injector?.releaseAll();
   } catch (error) {
@@ -117,10 +166,7 @@ function endSession() {
 function createWindow() {
   Menu.setApplicationMenu(null);
   win = new BrowserWindow({
-    width: 1160,
-    height: 790,
-    minWidth: 860,
-    minHeight: 640,
+    ...fitWindow(screen.getPrimaryDisplay().workArea),
     title: 'RK Screen',
     backgroundColor: '#17191b',
     icon: path.join(__dirname, '../assets/rk-screen.ico'),
@@ -135,6 +181,19 @@ function createWindow() {
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event) => event.preventDefault());
+  for (const event of ['enter-full-screen', 'leave-full-screen']) {
+    win.on(event, finishFullscreen);
+  }
+  // Reserve local escape keys before DOM handlers, including while a dialog is open.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (session?.role !== 'controller') return;
+    const escape = input.control && input.alt && input.shift && input.code === 'Space';
+    if (input.key !== 'F11' && !escape) return;
+    event.preventDefault();
+    if (input.type !== 'keyDown' || input.isAutoRepeat) return;
+    win.webContents.send('release-control', { escape });
+    setFullscreen(escape ? false : !win.isFullScreen());
+  });
   let recoveries = 0;
   win.webContents.on('render-process-gone', (_event, details) => {
     logEvent('renderer-exit: ' + details.reason);
@@ -173,6 +232,19 @@ function createWindow() {
     endSession();
     win = null;
   });
+}
+function fitCurrentWindow() {
+  if (!win || win.isDestroyed() || win.isFullScreen()) return;
+  const current = win.getNormalBounds();
+  const next = fitWindow(screen.getDisplayMatching(current).workArea, current);
+  win.setMinimumSize(next.minWidth, next.minHeight);
+  if (
+    !win.isMaximized() &&
+    !win.isMinimized() &&
+    ['x', 'y', 'width', 'height'].some((key) => current[key] !== next[key])
+  ) {
+    win.setBounds({ x: next.x, y: next.y, width: next.width, height: next.height });
+  }
 }
 handle('app-info', () => ({
   name: require('node:os').hostname(),
@@ -383,7 +455,10 @@ handle('pointer-enabled', (token, enabled) => {
   const s = authorized(token);
   if (s.role !== 'host' || typeof enabled !== 'boolean') throw new Error('Geçersiz işaretçi izni.');
   s.pointerEnabled = enabled;
-  if (!enabled) pointerOverlay.hide();
+  if (!enabled) {
+    pointerOverlay.hide();
+    localPointerOverlay.hide();
+  }
 });
 handle('pointer', (token, data) => {
   const s = authorized(token);
@@ -442,52 +517,29 @@ handle('input', (token, data) => {
   const s = authorized(token);
   if (
     s.role !== 'host' ||
-    !s.input ||
-    s.inputPaused ||
     data?.videoKey !== s.videoKey ||
     !validMessage(data) ||
     !inputTypes.has(data.type)
   )
-    return false;
-  if (!injector) {
-    const { InputInjector } = require('./input/injector');
-    injector = new InputInjector();
+    return { accepted: false, reason: 'stale', ...controlSnapshot(s) };
+  try {
+    if (
+      data.type !== 'release-input' &&
+      !['permission', 'video', 'manual'].includes(controlSnapshot(s).state) &&
+      !injector
+    ) {
+      const { InputInjector } = require('./input/injector');
+      injector = new InputInjector();
+    }
+    return applyInput(s, data, injector, screen);
+  } catch (error) {
+    logEvent('input-failed: ' + error.message);
+    s.inputError = 'windows';
+    try {
+      injector?.releaseAll();
+    } catch {}
+    return { accepted: false, reason: 'windows', ...controlSnapshot(s) };
   }
-  injector.keepAlive();
-  if (data.type === 'release-input') {
-    injector.releaseAll();
-    return true;
-  }
-  s.cursor.observe(injector.position(), Date.now());
-  if (s.controlPaused || Date.now() < s.cursor.localUntil) {
-    injector.releaseAll();
-    return false;
-  }
-  const b = s.display.bounds;
-  const dip = {
-    x: b.x + Math.round((b.width - 1) * (data.x || 0)),
-    y: b.y + Math.round((b.height - 1) * (data.y || 0)),
-  };
-  const physical = screen.dipToScreenPoint(dip);
-  if (data.type === 'mouse-move') {
-    if (!s.cursor.acceptMove(data.sequence) || Date.now() < s.cursor.localUntil) return false;
-    injector.moveMouse(physical.x, physical.y);
-    s.cursor.recordInjected(injector.position() || physical);
-  } else if (data.type === 'mouse-button') {
-    s.cursor.recordButton(data.sequence);
-    if (data.pressed && Date.now() < s.cursor.localUntil) return false;
-    const localActive = Date.now() < s.cursor.localUntil;
-    injector.mouseButton(
-      data.button,
-      data.pressed,
-      localActive ? undefined : physical.x,
-      localActive ? undefined : physical.y,
-    );
-    if (!localActive) s.cursor.recordInjected(injector.position() || physical);
-  } else if (data.type === 'mouse-wheel') injector.mouseWheel(data.dx, data.dy);
-  else if (data.type === 'key') injector.keyEvent(data.code, data.pressed);
-  else if (data.type === 'text') injector.text(data.text);
-  return true;
 });
 handle('cursor', (token) => {
   const s = authorized(token);
@@ -503,10 +555,11 @@ handle('cursor', (token) => {
     x: (p.x - b.x) / Math.max(1, b.width - 1),
     y: (p.y - b.y) / Math.max(1, b.height - 1),
   };
-  if (inside && s.pointerEnabled && !s.inputPaused && s.cursor.injected && control === 'none')
+  if (inside && s.pointerEnabled && !s.inputPaused)
     localPointerOverlay.update(b, normalized, require('node:os').hostname(), 'local');
   else localPointerOverlay.hide();
   return {
+    ...controlSnapshot(s),
     control,
     x: Math.max(0, Math.min(1, normalized.x)),
     y: Math.max(0, Math.min(1, normalized.y)),
@@ -528,9 +581,14 @@ handle('clipboard-permission', (token, value) => {
 handle('copy-id', async (value) => {
   if (/^\d{3} \d{3} \d{3}$/.test(value)) await clipboard.writeText(value);
 });
-handle('fullscreen', () => {
-  win.setFullScreen(!win.isFullScreen());
-  return win.isFullScreen();
+handle('fullscreen-state', () => fullscreenState());
+handle('fullscreen', (target) => {
+  if (target !== undefined && typeof target !== 'boolean')
+    throw Error('Geçersiz tam ekran isteği.');
+  const next = target ?? !win.isFullScreen();
+  if (next && session?.role !== 'controller')
+    throw Error('Tam ekran için açık bir uzak ekran oturumu gerekli.');
+  return setFullscreen(next);
 });
 async function pickFiles(token, droppedPaths, multiple) {
   authorized(token);
@@ -594,6 +652,8 @@ handle('file-cancel', (token) =>
 );
 app.whenReady().then(() => {
   if (!primaryInstance) return;
+  screen.on('display-metrics-changed', fitCurrentWindow);
+  screen.on('display-removed', fitCurrentWindow);
   // Independent of renderer/media health: never leave remotely held inputs stuck.
   let releaseFailed = false;
   const inputWatchdog = setInterval(() => {

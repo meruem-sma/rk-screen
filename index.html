@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="src/styles.css" />
     <script src="src/peerjs.min.js" defer></script>
     <script src="src/core/session.js" defer></script>
+    <script src="src/core/control.js" defer></script>
     <script src="src/core/video.js" defer></script>
     <script src="src/core/transport.js" defer></script>
     <script src="src/core/diagnostics.js" defer></script>
@@ -253,7 +254,7 @@
                 ><strong>Windows uyumluluk modu</strong
                 ><small
                   >Siyah ekran veya açılış sorunu yaşarsanız açın. Yeniden başlatınca uygulanır;
-                  görüntü performansı düşebilir.</small
+                  yazılım çizimi kullanılır ve görüntü en çok 30 FPS hedeflenir.</small
                 ></span
               >
               <input type="checkbox" id="compatibility-mode" />
@@ -388,6 +389,7 @@
             class="icon-button"
             id="fullscreen"
             aria-label="Tam ekran"
+            aria-pressed="false"
             title="Tam ekran · F11"
           >
             <svg><use href="#i-expand" /></svg>

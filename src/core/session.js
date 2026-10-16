@@ -87,6 +87,16 @@
           validVideoKey(m.videoKey) &&
           (m.control === undefined || ['none', 'manual', 'local'].includes(m.control))
         );
+      case 'control-state':
+        return (
+          validVideoKey(m.videoKey) &&
+          ['ready', 'local', 'manual', 'permission', 'video', 'windows', 'busy'].includes(
+            m.state,
+          ) &&
+          typeof m.pointerEnabled === 'boolean' &&
+          Number.isSafeInteger(m.revision) &&
+          m.revision > 0
+        );
       case 'pointer':
         return (
           unit(m.x) &&

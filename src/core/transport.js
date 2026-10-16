@@ -37,7 +37,13 @@
     const received = delta('packetsReceived'),
       lost = delta('packetsLost');
     const elapsed = same ? (row.timestamp - previous.timestamp) / 1000 : null;
+    const decodedTime = delta('totalDecodeTime');
+    const jitterTime = delta('jitterBufferDelay');
+    const jitterCount = delta('jitterBufferEmittedCount');
     return {
+      decodeMs: frames > 0 && decodedTime !== null ? (decodedTime * 1000) / frames : null,
+      jitterMs: jitterCount > 0 && jitterTime !== null ? (jitterTime * 1000) / jitterCount : null,
+      droppedFrames: delta('framesDropped'),
       freezeMs:
         delta('totalFreezesDuration') === null ? null : delta('totalFreezesDuration') * 1000,
       freezes: delta('freezeCount'),
@@ -60,6 +66,37 @@
         packetsLost: row.packetsLost,
         freezeCount: row.freezeCount,
         totalFreezesDuration: row.totalFreezesDuration,
+        totalDecodeTime: row.totalDecodeTime,
+        jitterBufferDelay: row.jitterBufferDelay,
+        jitterBufferEmittedCount: row.jitterBufferEmittedCount,
+        framesDropped: row.framesDropped,
+      },
+    };
+  }
+  function sendSample(row, previous) {
+    const same = previous?.id === row.id && row.timestamp > previous.timestamp;
+    const delta = (field) =>
+      same && finite(row[field]) && finite(previous[field]) && row[field] >= previous[field]
+        ? row[field] - previous[field]
+        : null;
+    const frames = delta('framesEncoded'),
+      seconds = delta('totalEncodeTime');
+    const bytes = delta('bytesSent');
+    const elapsed = same ? (row.timestamp - previous.timestamp) / 1000 : null;
+    return {
+      encodeMs: frames > 0 && seconds !== null ? (seconds * 1000) / frames : null,
+      sentFps: finite(row.framesPerSecond)
+        ? row.framesPerSecond
+        : frames !== null
+          ? frames / elapsed
+          : null,
+      videoBitrate: bytes !== null ? (bytes * 8) / elapsed : null,
+      previous: {
+        id: row.id,
+        timestamp: row.timestamp,
+        bytesSent: row.bytesSent,
+        framesEncoded: row.framesEncoded,
+        totalEncodeTime: row.totalEncodeTime,
       },
     };
   }
@@ -75,6 +112,8 @@
       this.networkStage = 0;
       this.cpu = 0;
       this.cpuGood = 0;
+      this.cpuPressure = 0;
+      this.cpuScale = 1;
     }
     update(profile, sample) {
       const before = this.limits(profile);
@@ -102,18 +141,26 @@
       this.networkLimited = this.networkStage > 0;
       if (sample.limitation === 'cpu') {
         this.cpuGood = 0;
+        this.cpuPressure++;
+        if (this.cpuPressure >= 4 && profile.allowScale)
+          this.cpuScale = Math.max(this.cpuScale, Math.min(2, profile.maxScale || 1));
+        if (this.cpuPressure >= 10 && profile.allowScale)
+          this.cpuScale = Math.max(this.cpuScale, profile.maxScale || 1);
         if (++this.cpu >= 2) {
           this.fps = before.fps > 30 ? 30 : Math.min(before.fps, 15);
           this.cpu = 0;
         }
       } else if (sample.limitation === 'none' && !congestion) {
         this.cpu = 0;
+        this.cpuPressure = 0;
         if (++this.cpuGood >= 5) {
           this.fps = before.fps < 30 && profile.fps > 30 ? 30 : null;
+          this.cpuScale = Math.max(1, this.cpuScale - 0.5);
           this.cpuGood = 0;
         }
       } else {
         this.cpu = 0;
+        this.cpuPressure = 0;
         this.cpuGood = 0;
       }
       const after = this.limits(profile);
@@ -130,10 +177,14 @@
         ),
         ...(profile.maxScale
           ? {
-              scale:
-                this.networkStage >= 2 && profile.allowScale
-                  ? Math.min(1.5, profile.maxScale)
-                  : profile.scale || 1,
+              scale: Math.min(
+                profile.maxScale,
+                Math.max(
+                  profile.scale || 1,
+                  profile.allowScale ? this.cpuScale : 1,
+                  this.networkStage >= 2 && profile.allowScale ? 1.5 : 1,
+                ),
+              ),
             }
           : {}),
       };
@@ -195,6 +246,7 @@
         'release-input',
         'ping',
         'pong',
+        'control-state',
       ].includes(type);
     }
     sendInput(message) {
@@ -269,6 +321,7 @@
     remoteLoss,
     selectedRoute,
     receiveSample,
+    sendSample,
     AdaptiveQuality,
     RecoveryBudget,
     RealtimeLane,

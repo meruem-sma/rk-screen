@@ -10,11 +10,12 @@
     speed: { bitrate: 2500000, fps: 24, hint: 'motion' },
     fluid: { bitrate: 24000000, fps: 60, hint: 'motion' },
   };
-  function qualitySettings(name, width = 1920, height = 1080) {
+  function qualitySettings(name, width = 1920, height = 1080, compatibility = false) {
     const p = profiles[name] || profiles.balanced;
     const factor = Math.max(1, Math.min(2, (width * height) / (1920 * 1080)));
     return {
       ...p,
+      fps: compatibility ? Math.min(30, p.fps) : p.fps,
       bitrate: Math.round(p.bitrate * factor),
       // Bound resolution reductions ourselves; an FPS preference must not
       // silently turn a 1080p desktop into unreadable 360p.

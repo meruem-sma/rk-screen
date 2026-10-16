@@ -53,6 +53,8 @@ for (const file of files) {
   checked++;
 }
 assert.equal(JSON.parse(asar.extractFile(archive, 'package.json')).version, pkg.version);
+assert.equal(JSON.parse(asar.extractFile(archive, 'package.json')).rkScreenBuild, pkg.rkScreenBuild,
+  'Packaged build number differs from current source');
 console.log(
   'Package verified: ' +
     checked +

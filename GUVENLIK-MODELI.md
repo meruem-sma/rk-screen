@@ -58,7 +58,10 @@ Bu sürüm sunucu kurmaz, özel altyapıya bağlanmaz ve kimlik doğrulanmış g
 - [Electron desktopCapturer](https://www.electronjs.org/docs/latest/api/desktop-capturer/): ekran yakalama API'si.
 - [MediaStreamTrack.stop](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack/stop): açık yakalamaların sonlandırılması; `stop()` çağrısı `ended` olayını kendiliğinden üretmez.
 
-Kod: `src/main.js`, `src/core/session.js`, `src/renderer.js`, `src/core/file-store.js`. Tekrarlanabilir doğrulamalar `tests/` içindedir. Testler `review/` altında geçici sonuçlar üretir; bu klasör dağıtımın parçası değildir ve testler arasında temizlenebilir.
+Kod: `src/main.js`, `src/core/session.js`, `src/renderer.js`, `src/core/file-store.js`.
+16 Ekim temizlik isteğiyle otomatik işlev testlerinin kaynakları ve geçici sonuçları
+kaldırıldı. `npm run check:source` yalnızca sözdizimini denetler; izin, bağlantı,
+görüntü veya kurulum güvenliğinin yeniden doğrulandığı anlamına gelmez.
 
 ## İsimli işaretçi sınırı
 

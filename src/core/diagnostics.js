@@ -13,12 +13,15 @@
       'relay-error',
       'file',
       'control',
+      'input',
+      'data-network',
     ],
-    control: ['none', 'manual', 'local'],
+    control: ['none', 'manual', 'local', 'ready', 'permission', 'video', 'windows', 'busy'],
     state: ['online', 'offline', 'waiting', 'unsupported'],
     route: ['direct', 'relay', 'unknown'],
     limitation: ['none', 'bandwidth', 'cpu', 'other', 'unknown'],
     profile: ['auto', 'balanced', 'detail', 'fluid', 'speed'],
+    reason: ['applied', 'released', 'stale', 'local', 'manual', 'permission', 'video', 'windows'],
   };
   const numbers = [
     'time',
@@ -39,6 +42,12 @@
     'fileBudget',
     'ackMs',
     'code',
+    'encodeMs',
+    'decodeMs',
+    'jitterMs',
+    'droppedFrames',
+    'sentFps',
+    'applyMs',
   ];
   function sanitizeEvents(entries) {
     if (!Array.isArray(entries) || entries.length > 120) throw Error('Geçersiz bağlantı raporu.');

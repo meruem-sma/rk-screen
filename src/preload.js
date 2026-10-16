@@ -31,6 +31,19 @@ contextBridge.exposeInMainWorld('rkScreen', {
   clipboardPermission: invoke('clipboard-permission'),
   copyId: invoke('copy-id'),
   fullscreen: invoke('fullscreen'),
+  fullscreenState: invoke('fullscreen-state'),
+  onFullscreen: (callback) => {
+    if (typeof callback !== 'function') return;
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('fullscreen-state', listener);
+    return () => ipcRenderer.removeListener('fullscreen-state', listener);
+  },
+  onReleaseControl: (callback) => {
+    if (typeof callback !== 'function') return;
+    const listener = (_event, options) => callback({ escape: options?.escape === true });
+    ipcRenderer.on('release-control', listener);
+    return () => ipcRenderer.removeListener('release-control', listener);
+  },
   selectFile: invoke('file-select'),
   pickFiles: (token, files) =>
     ipcRenderer.invoke(

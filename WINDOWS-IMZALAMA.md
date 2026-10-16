@@ -1,6 +1,7 @@
 # RK Screen Beta 1 — Windows kod imzalama
 
-16 Ekim 2026. Tek dağıtım `1.0.0-beta.1`, yapı `20261016.1`, Windows x64 NSIS setup.
+16 Ekim 2026. Genel ve yerel dağıtım `1.0.0-beta.1`, yapı `20261016.3`, Windows x64 NSIS setup.
+Yeni setup GitHub'a alındı; indirilmiş tam dosya özeti doğrulandı. Temiz Windows kurulum kabulü yapılmadı.
 Güncel dosya özeti `dist/1.0.0-beta.1/SHA256SUMS.txt` içindedir.
 
 ## Mevcut karar
@@ -16,7 +17,7 @@ yerel geliştirme çalıştırıcısı dağıtılan setup'ın imzalandığı anl
 
 ## Korunan derleme yolları
 
-- `npm run release:beta`: testleri çalıştırır ve açıkça imzasız beta adayı üretir.
+- `npm run release:beta`: kaynak sözdizimini kontrol eder ve açıkça imzasız beta adayı üretir.
   Çıktı `review/setup-candidate/1.0.0-beta.1/` altındadır. Güncel yayını doğrudan ezmez.
 - `npm run release` ve `npm run dist:setup`: güvenilir kod imzalama kimliği ister;
   kimlik yoksa durur. Bu yol gelecekte gerçek kimlik sağlanırsa kullanılabilir.
@@ -35,6 +36,8 @@ Gerçek imzalama kimliği olmadığı için başarılı imzalama yolu doğrulanm
 
 Aday test edilir, paket içeriği doğrulanır, güncel setup ve SHA-256 birlikte GitHub'a
 alınır. Yayın kaydı doğrulanmadan eski dosya silinmez. Site sürüm kaydı ve ZIP'i
-`../rk-screen-web/scripts/` içindeki yayın araçlarıyla güncellenir; ayrıntılı sıra
-[web yayın rehberindedir](../rk-screen-web/release-publication/GUNCEL-SURUM.md).
+`../RK-Screen-Web-Kaynak.zip` içindeki yayın araçlarıyla güncellenir. Önce bu arşivi
+çalışma alanında `rk-screen-web/` olarak açın; ayrıntılı sıra arşivdeki
+`release-publication/GUNCEL-SURUM.md` belgesindedir. GitHub ve yerel site ZIP'i güncellendi;
+InfinityFree dosyalarına yükleme yapılmadı.
 Kurulu uygulamalar kendiliğinden güncellenmez; iki bilgisayar da güncel setup'ı kurar.

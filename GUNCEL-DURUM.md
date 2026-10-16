@@ -1,89 +1,141 @@
-# RK Screen — Beta 1
+# RK Screen — yerel geliştirme ve araştırma
 
-16 Ekim 2026 · 1.0.0-beta.1 · yapı 20261016.1 · Windows x64 setup.
+16 Ekim 2026. Yerel yapı 20261016.3; sürüm adı 1.0.0-beta.1.
+Genel GitHub indirmesi de 20261016.3'e güncellendi. Kararlı 1.0 ilan edilmedi.
+InfinityFree için site ZIP'i hazırlandı; hosting'e yükleme ve gerçek Windows kurulumu yapılmadı.
 
-## Bu güncellemenin nedeni
+## Beta 1 dağıtımı — 20261016.3
 
-Kullanıcının 16 Ekim görüntülerinde doğrudan bağlantı 17 ms, kayıp %0 ve görüntü
-1080p / 30–44 FPS iken 2 MB dosya yaklaşık 9 KB/sn ilerliyor; sonra parça zaman aşımı
-veriyor. Kontrol bazı anlarda ekran sahibinin faresi etkin sanılarak bekliyor.
-Bunlar saha bulgusudur; fotoğraftaki 17 ms bütün internetlerin gecikmesi değildir.
+Yeni Windows x64 NSIS setup üretildi; arşivdeki 34 uygulama dosyasının güncel
+kaynaklarla aynı olduğu, sürüm/yapı ve geliştirme/özel anahtar dosyalarının
+pakete girmediği denetlendi. Boyut 112.828.231 bayt, SHA-256:
 
-## Uygulanan düzeltmeler
+`c8dd674dec3fac7a44b8ccaf1eaeb4a8190e5deddf29b26e85bc8ecb9bb9da89`
 
-- Dosya yüklemesi, izlenen videonun ters yöndeki RTP tahminiyle kısıtlanmaz.
-  Alındı onaylarının gecikmesine göre 4 Mbit/sn başlangıç bütçesi artırılır/azaltılır;
-  üst bütçe 16 Mbit/sn, alt sınır 64 kbit/sn. Bu değerler gerçek hız garantisi değildir.
-  Base64 ve mesaj ek yükü de gönderim bütçesine dahildir.
-- Ekranı paylaşan bilgisayarda, güncel gönderilen video hızı hesaba katılarak görüntüye
-  kapasite ayrılır. Eski medya tahmini 6 saniye sonra geçersiz olur.
-- En fazla sekiz adet 32 KiB parça aynı anda bekler: ham içerik penceresi 256 KiB.
-  Alıcının işlem kuyruğu da sınırlıdır. Geçerli onay geldikçe bekleme süresi yenilenir;
-  hiç ilerleme yoksa 45 saniyede bütün bekleyen işler kapatılır. Otomatik tekrar
-  gönderme/kesintiden devam yoktur. Alıcı onayı, SHA-256 ve dosya ezmeme korunur.
-- Hızlı dosya parçası ve onay trafiği ayrı sınıra alınır. Sınır aşımı artık güvenilir
-  parçayı sessizce düşürüp zaman aşımı bekletmez; aktarım açıkça durdurulur.
-- Klavye, tıklama, tekerlek, girdi bırakma ve bağlantı yoklaması için dosya kanalından
-  ayrı, sıralı ve güvenilir veri kanalı vardır. Hareket/işaretçi kanalı ayrı kalır.
-  Her iki yol da aynı oturum, izin, biçim ve hız kontrollerinden geçer.
-- Windows imleç gözlemi ve girdi sonrası gözlem aynı yerel koordinat okuyucusunu
-  kullanır. Electron DIP dönüşümüyle Windows konumunun karışmasının uygulamanın
-  kendi hareketini yerel kullanıcı hareketi sayması testte üretildi ve düzeltildi.
-  Gerçek yerel fare önceliği ve elle duraklatma korunur.
-- Yerel imleç bileşeni yüklenemezse yalnızca izleme paylaşımı da bozulmaz; bu,
-  Windows'un engellediği DLL'yi çalıştırmaz veya uzaktan kontrol engelini aşmaz.
-- Windows'ta işaretçi penceresi taşınırken üstte kalma durumu kaybolursa tekrar
-  uygulanır. Tıklamaları geçirme, odak almama ve yakalama koruması korunur.
-- Raporda dosya bütçesi, parça onay süresi, bekleyen veri miktarı ve kontrolün
-  bekleme nedeni bulunur. Rapor IP, parola, cihaz adı/kimliği, dosya adı/içeriği,
-  ekran veya sohbet içermez; yalnızca kullanıcı kaydettiğinde yerel dosyaya yazılır.
-- Bağlantı biçimi v9 oldu. İki bilgisayarda da bu yapı kurulmalıdır; eski yapıyla
-  karışık kullanım desteklenmez. Uygulama sürüm adı yine yalnızca Beta 1'dir.
+GitHub'a önce ayrı aday yüklendi; mevcut indirme ancak yeni dosya hazırken değişti.
+Genel URL'den setup tekrar indirilip tam SHA-256 ve boyut doğrulandı. `release.json`,
+dosya özeti ve sürüm notları yenilendi; önceki setup yeni indirme/kayıt doğrulandıktan
+sonra kaldırıldı. Tek yayın Beta 1 olarak kaldı. `signed:false`, `installVerified:false`;
+paketleme kontrolü temiz Windows kurulumu veya saha kabulü değildir.
 
-## Doğrulama kapsamı
+Site HTTP ve çift tıklama önizlemesinde masaüstü/mobil CSS, menü, yapı ve doğru
+setup/hash bağlantısıyla doğrulandı. Yükleme ZIP'i 14 dosya içerir; dosyalar ZIP'e
+yazıldıktan sonra kaynaklarıyla tek tek SHA-256 karşılaştırıldı. `.htaccess` dahildir;
+EXE, kaynak kod ve özel anahtar ZIP'e girmez. Hosting'in SSL/Apache ayarları bu yerel
+kontrolle doğrulanmış sayılmaz. Canlı InfinityFree dosyaları değiştirilmedi.
 
-61 birim testi; Windows arayüzü, yerel gerçek PeerJS/WebRTC, iki imleç, kesinti,
-Türkçe klavye, denetim izni, ekran değişimi, sohbet, çoklu dosya ve açılış testleri.
-Windows ana süreç testi gerçek ekran yakalar, fakat kullanıcının faresine/klavyesine
-basmaz. Tutarsız iki konum okuyucusu test ortamında bilerek oluşturulur.
-WebRTC dosya denemesi 2 MB'tan büyük rastgele veri, SHA-256 ve iki yönde aktarım içerir.
-Bu, gerçek iki uzak bilgisayarda performans ölçümü değildir.
-16 Ekim npm resmî bağımlılık taramasında bildirilen açık sayısı 0; bu bağımsız
-güvenlik denetimi veya sıfır risk garantisi değildir.
+## 20261016.3 — kontrol, iki işaretçi ve tam ekran
 
-## 1.0 öncesinde hâlâ gerekenler
+- Ana süreç girdi sonucu artık kabul/ret ve neden kodu içeriyor. Kontrol durumu,
+  revizyonu ve işaretçi izni ayrı güvenilir kanaldan bildiriliyor; geç gelen imleç
+  konumu daha yeni kontrol durumunu değiştirmiyor. Yerel kullanıcı, izin, görüntü
+  bekleme ve Windows reddi arayüzde ayrı açıklanıyor.
+- İzin kapansa veya görüntü beklese bile uygulamanın basılı girdileri bırakılabiliyor.
+  Yerel fare önceliği korunuyor; iki piksele kadar küçük titreşim süreyi sürekli
+  yenilemiyor. Yavaş gerçek hareket birikerek algılanıyor. Yerel klavye için native
+  kaynak ayrımı henüz eklenmedi.
+- Ekran sahibinin isimli işaretçisi artık yalnız uzak fare Windows imlecini taşırken
+  değil, izin verilen görünür paylaşımda da çiziliyor. İşaretçi izni kapanınca iki
+  native katman ve karşı taraftaki iki çizim gizleniyor.
+- Tam ekran giriş/çıkış olayları düğme durumunu senkronize ediyor. Geçiş sırasında
+  girdi bırakılıyor; diyalog/sohbet odağı zorla alınmıyor. F11 ana süreçte yakalanıyor;
+  Ctrl+Alt+Shift+Boşluk kontrolü bırakıp izlemeye ve pencere moduna dönüyor.
+- Raporlara desteklenen cihazlarda kare başına kodlama/çözme süresi, gönderilen FPS,
+  jitter tampon beklemesi, atılan kare sayısı ve yerel IPC girdi süresi eklendi.
+  Sonuncusu ağ gecikmesi değildir. Veri kanalı ping'i raporda ayrı olaydır; medya
+  RTT'si ile karıştırılmaz. Rapora tuş metni/sohbet/parola eklenmez.
 
-- Çalışan varsayılan TURN yok. Doğrudan bağlantı kurulamayan ağ çiftleri için
-  geçerli aktarma altyapısı gerekir. InfinityFree/GitHub statik barındırma TURN değildir.
-  Hesap/başvuru/ücretli hizmet alınmadı; çalışmayan genel relay bilgileri pakete eklenmez.
-- Bu yeni yapıyla iki fiziksel bilgisayarda, farklı internetlerde tekrar test:
-  Otomatik ve Net metin; küçük yazı, kaydırma, hareketli içerik ve eş zamanlı dosya.
-  Gerçek FPS, gecikme, kayıp, donma ve dosya hızını iki taraftaki raporlarla karşılaştırın.
-- Karma DPI/çoklu monitör, Türkçe Q/F, gerçek yerel fare devralma, uyku/uyanma ve ağ değişimi.
-- Ayrı temiz Windows 10/11 kurulum, eski kurulum üzerine yükseltme ve kaldırma.
-  installVerified hâlâ false. Kaynak testi bu kabulün yerine geçmez.
-- Kurulum imzasız. Windows Akıllı Uygulama Denetimi engeli çözülmüş değildir.
-  Setup'a çevirmek yayıncı imzası sağlamaz. Koruma kapatma veya sahte imza eklenmez.
-- Kalıcı doğrulanmış cihaz kimliği ve bağımsız güvenlik denetimi tamamlanmadı.
-  Elle karşılaştırılan oturum kodu veri bağlantısına dayanır; ayrı medya sertifikaları
-  bu koda dahil değildir. Cihaz adı tek başına kimlik kanıtı değildir.
+Doğrulama: gerçek Electron 44.8.0 ana süreci/arayüzünde normal ve uyumluluk modunda
+izin/görüntü/eski paket kapıları, sanal Windows reddi/yeniden deneme, 100 tıklama
+çifti, 50 tuş çifti, iki native ve arayüz işaretçisi, eski durum revizyonu reddi,
+20 tam ekran giriş/çıkışı, F11, düğme, modal odak ve acil bırakma geçti. Gerçek
+Windows masaüstüne fare/klavye enjekte edilmedi; WAN, Türkçe fiziksel klavye,
+karma DPI ve yeni setup kabulü yapılmadı. Normal modun kapanışlarında GPU günlük
+mesajı tekrarlandı; uyumluluk modunda görülmedi. Kök neden doğrulanmadı.
+Sanal doğrulama saha testi değildir. Geliştirme bağımlılıkları yeniden kuruldu;
+geçici deneme kaynakları/profilleri tutulmaz, kalıcı test kaynakları geri eklenmedi.
+Tam plan: [GELISTIRME-PLANI.md](GELISTIRME-PLANI.md). Bu kaynaklar ardından yukarıdaki
+beta dağıtımına alındı. Dosya aktarım protokolü ve çalışan varsayılan TURN değiştirilmedi.
 
-Karar: kararlı 1.0 ilan edilmez. Sabit 60 FPS, bütün cihazlar/ağlarda çalışma ve
-AnyDesk/TeamViewer düzeyi güvenilirlik sözü verilmez. Serbest çizim, kesilen dosyaya
-devam ve otomatik kurulum mevcut temel işlevler doğrulanana kadar sonraya kalabilir.
+## Uygulanan iyileştirmeler
 
-## Yayın ve temizlik
+- Electron 44.4.5 yerine resmî kararlı 44.8.0 sabitlendi. Resmî notlarda Windows yerel
+  pencere imleci, ağ hizmeti yeniden başladığında net.fetch/session.fetch ve tam ekran
+  durumuna ilişkin düzeltmeler var; Chromium/V8 ve Node güncellemeleri de içeriyor.
+  Bu, kullanıcının her sorununun aynı kökten geldiğini veya tümünün giderildiğini kanıtlamaz.
+- Pencere ilk açılışta ekranın kullanılabilir DIP alanına sığar. Küçük ekran veya yüksek
+  ölçeklendirmede minimum boyut ekranı aşmaz. Ekran alanı değişince/kaldırılınca mevcut
+  pencere görünür alana alınır; tam ekran oturumuna müdahale edilmez.
+- Süren işlemci darboğazında Otomatik/Akıcı/Düşük veri önce FPS hedefini azaltır;
+  yük sürerse kodlanan görüntü 4K kaynakta önce 1080p, sonra en çok 720p'ye indirilebilir.
+  Küçük kaynak büyütülmez; Net metin çözünürlüğünü korur. İyi ölçümlerle kademeli döner.
+  Eksik ölçüm iyileşme sayılmaz; profilin bitrate tavanı tekrar tekrar kırpılmaz.
+- GPU'nun kapatıldığı Windows uyumluluk modunda yakalama ve kodlama hedefi en çok
+  30 FPS olur. Normal moddaki 60 FPS üst hedefi korunur. Yazılım çizimi ücretsizdir
+  fakat işlemci yükünü artırabilir; bu yüzden herkese zorunlu varsayılan yapılmaz.
+- Önceki yapının ayrı güvenilir klavye/tıklama kanalı, 256 KiB dosya penceresi,
+  alındı onayına göre dosya bütçesi, ilerlemeyi izleyen zaman aşımı, iki görsel imleç,
+  gerçek yerel fare önceliği, izinler ve SHA-256 bütünlük kontrolü korunur.
 
-Yeni aday bütün kaynak/paket kontrollerinden geçmeden mevcut indirme silinmez.
-Doğrulanan setup aynı v1.0.0-beta.1 yayınına, yeni yapı ve SHA-256 ile alınır.
-GitHub dosyası, genel sürüm kaydı ve site paketi eşleştikten sonra eski yerel çıktı
-silinir. Kullanıcı ayarları, alınmış dosyalar, kaynak, test ve lisans belgeleri korunur.
-Kurulu uygulamalar kendiliğinden güncellenmez; iki bilgisayar da yeni setup'ı kurar.
+## Son kontroller ve kapsamları
 
-Canlı site 15 Ekim tarayıcı kontrolünde HTTPS, CSS ve GitHub indirmesiyle açıldı.
-Bu güncellemenin hosting dosyaları ayrıca yüklenmelidir; indirme düğmesi GitHub'daki
-geçerli sürüm kaydını okur. Yüklenecek çıktı çalışma alanındaki RK-Screen-Site.zip'tir.
+Temizlikten önce 64 birim testi; arayüz, gerçek yerel WebRTC, 2 MB üzeri rastgele
+veri aktarımı, sohbet, monitör geçişi, kontrol izni, işaretçi, açılış ve gerçek Windows
+ekran yakalama kontrolleri uygulandı. Normal ve uyumluluk modu ayrıca denendi.
+Testler kullanıcının gerçek faresine/klavyesine girdi göndermez.
+44.8.0'de ilk gizli pencere görüntüsü denemesi UnknownVizError verdi; temiz test
+profilindeki tekrar geçti. Eski profilden yükseltmenin bütün cihazlarda kabul
+edildiği sonucu çıkarılamaz. Son npm taramasında bildirilen açık sayısı 0;
+bu bağımsız güvenlik denetimi değildir.
+Kullanıcının açık cevabı: “Test kaynaklarını da kaldır.” Bu nedenle bu testler,
+sonuçları ve testlere bağlı npm/CI adımları silindi. Sonraki değişiklikler aynı
+otomatik işlev kontrolleriyle korunmuyor. Kalan check:source yalnızca sözdizimidir.
+Yerel kontrol gerçek iki uzak cihazda kalite ölçümü veya temiz kurulum kabulü değildir.
 
-Kaynaklar: [WebRTC istatistikleri](https://www.w3.org/TR/webrtc-stats/),
-[TURN](https://webrtc.org/getting-started/turn-server),
-[Windows Akıllı Uygulama Denetimi](https://support.microsoft.com/en-us/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions).
+## Araştırma ve alınan kararlar
+
+| Sıkıntı | Bu proje için sonuç |
+| --- | --- |
+| İşlemci/GPU kodlama yükü | Tek FPS değerini bütün cihazlara dayatmak yerine gerçek darboğaz ölçümüyle azaltma. Net metinde çözünürlük tercihi ayrı tutulur. |
+| Ana süreçte ağır iş ve fazla bileşen | Dosyalar sınırlı parçalarla/asenkron işlenir; ek UI kütüphanesi veya arka plan hizmeti eklenmedi. Electron'un taban bellek maliyeti sürer. |
+| Yüksek DPI ve küçük ekran | Fiziksel piksel ile DIP karıştırılmaz; pencere alanı çalışma alanına göre sınırlanır. Çoklu monitörde gerçek saha kabulü yine gerekir. |
+| NAT/CGNAT ve kapalı UDP | STUN her koşulda yeterli değildir. Çalışan TURN gerekir; statik site ve GitHub dosya barındırma bu işi yapmaz. Dil değiştirmek NAT sınırını kaldırmaz. |
+| Windows yetki sınırları | SendInput yalnızca izin verilen bütünlük düzeylerinde çalışır; yönetici ve UAC güvenli masaüstü normal kullanıcı uygulamasından yönetilemeyebilir. |
+| Windows 7/8 ve 32 bit | Güncel Electron bu eski Windows sürümlerini desteklemez. Bu proje yalnızca Windows 10/11 x64 hedefler; eski motorla güvenliği düşürme kararı alınmadı. |
+| İmzasız paket | Setup'a çevirmek yayıncı imzası sağlamaz. Bu tur sertifika, hizmet veya hesap alınmadı; Windows korumaları kapatılmadı. |
+
+Yararları: ortak Chromium/WebRTC altyapısı, şifreli taşıma, donanım destekli kodlama
+imkânı, akış sırasında ölçüm ve kendimize ait arayüz. Sınırları: Electron taban
+bellek/disk maliyeti, sürücü bağımlılığı, mevcut genel sinyal hizmeti ve eksik TURN.
+Bu yüzden AnyDesk/TeamViewer ile eşdeğer güvenilirlik veya her cihazda kesintisizlik
+iddiası yoktur. Yeni bir dile tam geçiş bu sorunları tek başına çözmez.
+
+Kaynaklar:
+
+- [Electron performans](https://www.electronjs.org/docs/latest/tutorial/performance)
+- [Electron 44.8.0 resmî notları](https://github.com/electron/electron/releases/tag/v44.8.0)
+- [Electron ekran/DIP API'si](https://www.electronjs.org/docs/latest/api/screen)
+- [Electron eski Windows desteğinin sonu](https://releases.electronjs.org/release/v23.0.0)
+- [WebRTC TURN](https://webrtc.org/getting-started/turn-server)
+- [WebRTC ölçümleri](https://www.w3.org/TR/webrtc-stats/)
+- [W3C görüntü tercihleri](https://www.w3.org/TR/mst-content-hint/)
+- [Microsoft SendInput/UIPI](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
+- [Electron güvenlik](https://www.electronjs.org/docs/latest/tutorial/security)
+
+## Kalan kabul işleri
+
+Yeni kaynakla iki gerçek bilgisayarda zayıf/iyi ağ, Türkçe Q/F, karma DPI/çoklu
+monitör, uyku/uyanma ve ağ değişimi sınanmalı. Çalışan varsayılan TURN, bağımsız
+güvenlik denetimi, kalıcı doğrulanmış cihaz kimliği ve temiz Windows kurulum/
+yükseltme/kaldırma kabulü tamamlanmadı. Oturum kodu veri bağlantısına dayanır;
+ayrı medya sertifikalarını kapsamaz. Gerçek cihaz raporu olmadan bütün sorunların
+çözüldüğü söylenmez. Bir sonraki paketleme sonrasında iki cihaz da aynı yapıyı kullanmalı.
+
+## Temiz çalışma alanı
+
+Kurulu uygulamanın klasörü ve kaldırıcı zaten yoktu; gerideki RK Screen kaldırma
+kaydı ve iki eski Menzil/rk-screen ayar/önbellek klasörü temizlendi. Kullanıcının
+İndirilenler dosyaları silinmedi. Test kaynakları/çıktıları, derlenmiş uygulama,
+indirilebilir bağımlılık kopyaları, eski karşılaştırma notu, editör önerileri,
+yerel GitHub CLI kopyası ve açık site kopyaları kaldırıldı. Site kaynakları önce
+ZIP içinde dosya dosya doğrulandı; hazır hosting ZIP'i değiştirilmedi.

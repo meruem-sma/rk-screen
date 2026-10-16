@@ -26,7 +26,12 @@
     }
     observe(point, now) {
       if (!point) return;
-      const moved = !this.physical || point.x !== this.physical.x || point.y !== this.physical.y;
+      // Compare with the last meaningful position, so slow movement accumulates
+      // while one-pixel device jitter cannot renew local priority forever.
+      const moved =
+        !this.physical ||
+        Math.abs(point.x - this.physical.x) > 2 ||
+        Math.abs(point.y - this.physical.y) > 2;
       const injected =
         this.injected &&
         Math.abs(point.x - this.injected.x) <= 1 &&
@@ -35,7 +40,7 @@
         this.local = { ...point };
         if (this.physical) this.localUntil = now + 1200;
       }
-      this.physical = { ...point };
+      if (moved || injected) this.physical = { ...point };
     }
     recordInjected(point) {
       this.physical = this.injected = { ...point };

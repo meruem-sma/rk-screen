@@ -1,4 +1,4 @@
-name: Source checks
+name: Syntax and dependency checks
 on:
   push:
     branches: [main]
@@ -17,9 +17,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=high
-      - run: npm test
-      - run: npm run test:ui
-      - run: npm run test:e2e
-      - run: npm run test:startup
-      - run: npm run test:overlay
-      - run: npm run test:native
+      - run: npm run check:source
